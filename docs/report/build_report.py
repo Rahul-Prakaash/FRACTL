@@ -31,7 +31,7 @@ st = {
     "sub2": ParagraphStyle("sub2", fontName="Calibri", fontSize=12, leading=16, textColor=SLATE, alignment=TA_CENTER),
     "h1": ParagraphStyle("h1", fontName="Calibri-Bold", fontSize=16, leading=20, textColor=NAVY, spaceBefore=16, spaceAfter=6, keepWithNext=1),
     "h2": ParagraphStyle("h2", fontName="Calibri-Bold", fontSize=13, leading=17, textColor=BLUE, spaceBefore=12, spaceAfter=5, keepWithNext=1),
-    "p": ParagraphStyle("p", fontName="Calibri", fontSize=11, leading=15, textColor=colors.black, spaceAfter=6),
+    "p": ParagraphStyle("p", fontName="Calibri", fontSize=11, leading=15, textColor=colors.black, spaceAfter=6, allowWidows=0, allowOrphans=0),
     "h3": ParagraphStyle("h3", fontName="Calibri-Bold", fontSize=11.5, leading=15, textColor=NAVY, spaceBefore=10, spaceAfter=3, keepWithNext=1),
     "pk": ParagraphStyle("pk", fontName="Calibri", fontSize=11, leading=15, spaceAfter=6, keepWithNext=1),
     "cap": ParagraphStyle("cap", fontName="Calibri-Italic", fontSize=10, leading=13, textColor=CAP, alignment=TA_CENTER, spaceBefore=3, spaceAfter=8),
@@ -110,14 +110,16 @@ doc.addPageTemplates([PageTemplate("cover", [fr]), PageTemplate("body", [fr], on
 
 S = []
 # ---------------- cover (template layout) ----------------
-S += [Spacer(1, 50), P("BCSE307P Compiler Design Lab", "title"), Spacer(1, 4),
-      P("Innovative Project", "sub"), Spacer(1, 40),
+st["covh"] = ParagraphStyle("covh", parent=st["title"], fontSize=20, leading=26)
+S += [Spacer(1, 40), P("BCSE307P Compiler Design Lab", "covh"), P("Innovative Project", "covh"), Spacer(1, 34),
       P("FRACTL", "title"), Spacer(1, 6),
-      P("A compiler from L-system grammars to native code via LLVM", "sub"), Spacer(1, 36),
+      P("A compiler from L-system grammars to native code via LLVM", "sub"), Spacer(1, 32),
       Paragraph("<i>by</i>", st["cov"]), Spacer(1, 10)]
-ct = Table([[Paragraph("<b>Reg No</b>", st["cov"]), Paragraph("<b>Team Member Names</b>", st["cov"])],
-            ["", ""], ["", ""]], colWidths=[150, 250], rowHeights=[24, 28, 28])
-ct.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, 0), 0.75, NAVY), ("LINEBELOW", (0, 1), (-1, -1), 0.4, colors.HexColor("#BFC8D8"))]))
+TEAM = [("24BCE0135", "Rahul Prakaash V"), ("24BCE0115", "Aditya Karthik"), ("24BCE2665", "Dhruthi K")]
+ct = Table([[Paragraph("<b>Reg No</b>", st["cov"]), Paragraph("<b>Team Member Names</b>", st["cov"])]] +
+           [[Paragraph(f"<b>{r}</b>", st["cov"]), Paragraph(f"<b>{n}</b>", st["cov"])] for r, n in TEAM],
+           colWidths=[150, 250], rowHeights=[26] + [28] * len(TEAM))
+ct.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, 0), 0.75, NAVY), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
 S += [ct, Spacer(1, 46), P("Under the Supervision of", "cov"), Spacer(1, 4),
       P("Prof. NIVITHA K", "covb"), P("Assistant Professor Sr. Grade-2", "covb"),
       P("School of Computer Science and Engineering", "covb"), Spacer(1, 10)]
