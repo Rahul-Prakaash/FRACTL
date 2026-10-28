@@ -1,0 +1,705 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FRACTL — compiler stage viewer</title>
+<style>
+  :root {
+    --bg:      #f6f7f9;
+    --panel:   #ffffff;
+    --ink:     #16202c;
+    --muted:   #62717f;
+    --line:    #dde3ea;
+    --accent:  #2563c9;
+    --accent-soft: #e8f0fd;
+    --code-bg: #10161d;
+    --code-ink:#d8e2ec;
+    --warn-bg: #fff6e0;
+    --warn-ink:#7a5a00;
+    --add:     #dff3e2;
+    --del:     #fde6e6;
+    --mono: ui-monospace, "Cascadia Mono", "Consolas", "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  header {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--panel); border-bottom: 1px solid var(--line);
+    padding: 10px 18px;
+  }
+  .titlebar { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .titlebar h1 { margin: 0; font-size: 17px; letter-spacing: .2px; }
+  .titlebar .sub { color: var(--muted); font-size: 12px; }
+  .spacer { flex: 1 1 auto; }
+  .mode {
+    font: 11px/1 var(--mono); color: var(--muted);
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 9px;
+  }
+  .tabs { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .tab {
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    border-radius: 7px; padding: 6px 13px; cursor: pointer; font-size: 13px;
+  }
+  .tab:hover { border-color: var(--accent); }
+  .tab[aria-selected="true"] {
+    background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600;
+  }
+
+  main { padding: 16px; display: grid; gap: 14px; grid-template-columns: 1fr; max-width: 1500px; margin: 0 auto; }
+  @media (min-width: 1050px) { main { grid-template-columns: 1fr 1fr; } }
+  .wide { grid-column: 1 / -1; }
+
+  section.panel {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    overflow: hidden; display: flex; flex-direction: column;
+  }
+  .phead {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 13px; border-bottom: 1px solid var(--line); background: #fbfcfd;
+  }
+  .phead h2 { margin: 0; font-size: 13px; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); }
+  .phead .count { font: 11px var(--mono); color: var(--muted); }
+  .pbody { padding: 12px 13px; overflow: auto; }
+
+  button.mini, select.mini {
+    font: 12px system-ui, sans-serif; padding: 4px 9px; cursor: pointer;
+    background: var(--panel); color: var(--ink);
+    border: 1px solid var(--line); border-radius: 6px;
+  }
+  button.mini:hover { border-color: var(--accent); color: var(--accent); }
+  button.mini[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+  pre, code { font-family: var(--mono); }
+  pre.code {
+    margin: 0; padding: 11px; background: var(--code-bg); color: var(--code-ink);
+    border-radius: 7px; font-size: 12px; line-height: 1.45;
+    overflow: auto; max-height: 420px; white-space: pre;
+  }
+  .wrapstr { white-space: pre-wrap; word-break: break-all; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td { text-align: left; padding: 3px 9px 3px 0; vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--line); }
+  tbody tr:nth-child(even) { background: #fafbfc; }
+  td.mono, th.mono { font-family: var(--mono); }
+  td.num { text-align: right; font-family: var(--mono); }
+
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 3px 16px; font-size: 13px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-family: var(--mono); }
+
+  .note { color: var(--muted); font-size: 12.5px; }
+  .placeholder {
+    color: var(--muted); font-size: 12.5px; padding: 14px;
+    border: 1px dashed var(--line); border-radius: 7px; background: #fbfcfd;
+  }
+  .banner {
+    margin: 14px 16px 0; padding: 11px 13px; border-radius: 8px;
+    background: var(--warn-bg); color: var(--warn-ink); border: 1px solid #f0dca6; font-size: 13px;
+  }
+  .banner code { background: rgba(0,0,0,.06); padding: 1px 4px; border-radius: 3px; }
+
+  #svgViewport {
+    position: relative; height: 520px; background:
+      linear-gradient(45deg, #eef1f4 25%, transparent 25%, transparent 75%, #eef1f4 75%),
+      linear-gradient(45deg, #eef1f4 25%, #f8f9fb 25%, #f8f9fb 75%, #eef1f4 75%);
+    background-size: 18px 18px; background-position: 0 0, 9px 9px;
+    overflow: hidden; cursor: grab; touch-action: none;
+  }
+  #svgViewport.dragging { cursor: grabbing; }
+  #svgStage { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  #svgStage svg, #svgStage img { display: block; max-width: none; }
+  .zoomreadout { font: 11px var(--mono); color: var(--muted); min-width: 52px; text-align: right; }
+
+  .bars { display: grid; grid-template-columns: max-content 1fr max-content; gap: 3px 9px; align-items: center; font-size: 12.5px; }
+  .bars .lbl { font-family: var(--mono); }
+  .bars .track { background: #eef1f5; border-radius: 3px; height: 13px; overflow: hidden; }
+  .bars .fill { height: 100%; background: var(--accent); border-radius: 3px; }
+  .bars .val { font-family: var(--mono); color: var(--muted); }
+  .statgroup + .statgroup { margin-top: 14px; }
+  .statgroup h3 { margin: 0 0 7px; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+
+  .diffgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 800px) { .diffgrid { grid-template-columns: 1fr; } }
+  .diffgrid h3 { margin: 0 0 5px; font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .diffline { display: block; padding: 0 4px; }
+  .diffline.changed-l { background: rgba(255,120,120,.22); }
+  .diffline.changed-r { background: rgba(120,220,150,.20); }
+  .diffline.gap       { background: rgba(255,255,255,.04); }
+
+  .slider-row { display: flex; align-items: center; gap: 11px; }
+  .slider-row input[type=range] { flex: 1 1 auto; }
+  .slider-row .k { font: 12px var(--mono); color: var(--muted); min-width: 92px; }
+  footer { padding: 10px 18px 26px; color: var(--muted); font-size: 12px; text-align: center; }
+</style>
+</head>
+<body>
+
+<script src="data/bundle.js"></script>
+<header>
+  <div class="titlebar">
+    <h1>FRACTL</h1>
+    <span class="sub">compiler stage viewer — precomputed artifacts, not a live compiler</span>
+    <span class="spacer"></span>
+    <span class="mode" id="modeBadge">loading…</span>
+  </div>
+  <div class="tabs" id="tabs" role="tablist"></div>
+</header>
+<div id="banner" hidden class="banner"></div>
+
+<main id="main">
+  
+  <section class="panel wide">
+    <div class="phead">
+      <h2>Rendered output</h2>
+      <span class="count" id="svgSrc"></span>
+      <span class="spacer"></span>
+      <span class="zoomreadout" id="zoomReadout">100%</span>
+      <button class="mini" id="zoomOut" title="zoom out">−</button>
+      <button class="mini" id="zoomIn" title="zoom in">+</button>
+      <button class="mini" id="zoomFit">fit</button>
+      <button class="mini" id="zoomReset">reset view</button>
+    </div>
+    <div id="svgViewport"><div id="svgStage"></div></div>
+    <div class="pbody" style="padding-top:8px">
+      <span class="note">Scroll to zoom around the cursor, drag to pan. Rendered SVG is Member 2's output.</span>
+    </div>
+  </section>
+  <section class="panel">
+    <div class="phead">
+      <h2>Source</h2><span class="count" id="srcCount"></span>
+      <span class="spacer"></span>
+      <button class="mini" data-copy="source">copy</button>
+      <button class="mini" data-collapse="srcBody" aria-pressed="false">collapse</button>
+    </div>
+    <div class="pbody" id="srcBody"><pre class="code" id="srcPre"></pre></div>
+  </section>
+  <section class="panel">
+    <div class="phead">
+      <h2>AST — FractalDecl</h2>
+      <span class="spacer"></span>
+      <button class="mini" data-collapse="astBody" aria-pressed="false">collapse</button>
+    </div>
+    <div class="pbody" id="astBody"></div>
+  </section>
+  <section class="panel">
+    <div class="phead">
+      <h2>Tokens</h2><span class="count" id="tokCount"></span>
+      <span class="spacer"></span>
+      <button class="mini" id="tokMore" hidden>show all</button>
+      <button class="mini" data-collapse="tokBody" aria-pressed="false">collapse</button>
+    </div>
+    <div class="pbody" id="tokBody"></div>
+  </section>
+  <section class="panel">
+    <div class="phead">
+      <h2>Turtle IR</h2><span class="count" id="irCount"></span>
+      <span class="spacer"></span>
+      <button class="mini" id="irMore" hidden>show more</button>
+      <button class="mini" data-collapse="irBody" aria-pressed="false">collapse</button>
+    </div>
+    <div class="pbody" id="irBody"></div>
+  </section>
+  <section class="panel wide">
+    <div class="phead">
+      <h2>Expanded L-system string</h2><span class="count" id="expCount"></span>
+      <span class="spacer"></span>
+      <button class="mini" id="expToggle">show full</button>
+      <button class="mini" data-copy="expanded">copy</button>
+    </div>
+    <div class="pbody"><pre class="code wrapstr" id="expPre"></pre></div>
+  </section>
+  <section class="panel">
+    <div class="phead"><h2>Counts</h2><span class="spacer"></span>
+      <button class="mini" data-collapse="statBody" aria-pressed="false">collapse</button>
+    </div>
+    <div class="pbody" id="statBody"></div>
+  </section>
+  <section class="panel" id="iterPanel" hidden>
+    <div class="phead"><h2>Iteration</h2><span class="count" id="iterNote"></span></div>
+    <div class="pbody">
+      <div class="slider-row">
+        <input type="range" id="iterRange" min="0" max="0" step="1" value="0">
+        <span class="k" id="iterLabel">n = 0</span>
+      </div>
+      <p class="note" style="margin:9px 0 0">Swaps the counts and expanded-string panels to a pre-generated
+      frame. The rendered SVG stays at the demo's declared iteration count.</p>
+    </div>
+  </section>
+  <section class="panel wide">
+    <div class="phead">
+      <h2>LLVM IR</h2><span class="count" id="llCount"></span>
+      <span class="spacer"></span>
+      <button class="mini" id="llModeRaw"  aria-pressed="true">-O0</button>
+      <button class="mini" id="llModeOpt"  aria-pressed="false">optimized</button>
+      <button class="mini" id="llModeDiff" aria-pressed="false">side by side</button>
+    </div>
+    <div class="pbody" id="llBody"></div>
+  </section>
+</main>
+<footer>Artifacts are precomputed by the FRACTL compiler; this page only navigates them.</footer>
+
+<script>
+"use strict";
+const BUNDLE = (typeof window !== "undefined" && window.FRACTL_BUNDLE) || null;
+let   loadMode = BUNDLE ? "bundle" : "fetch";
+async function loadText(path) {
+  if (BUNDLE && Object.prototype.hasOwnProperty.call(BUNDLE, path)) return BUNDLE[path];
+  if (BUNDLE) throw new Error("not in bundle: " + path + " (re-run pack.ps1)");
+  const res = await fetch(path, { cache: "no-store" });
+  if (!res.ok) throw new Error(res.status + " " + res.statusText);
+  return await res.text();
+}
+async function loadJson(path) { return JSON.parse(await loadText(path)); }
+async function tryLoadText(path) { try { return await loadText(path); } catch (e) { return null; } }
+async function tryLoadJson(path) { try { return await loadJson(path); } catch (e) { return null; } }
+const $ = (id) => document.getElementById(id);
+const el = (tag, cls, text) => {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+};
+const clear = (node) => { while (node.firstChild) node.removeChild(node.firstChild); };
+const fmt = (n) => n.toLocaleString("en-US");
+function placeholder(node, msg) { clear(node); node.appendChild(el("div", "placeholder", msg)); }
+let demos = [];
+let current = null;
+let data = null;
+let frames = 0;
+let activeFrame = null;
+
+const viewport = $("svgViewport"), stage = $("svgStage");
+let scale = 1, tx = 0, ty = 0;
+function applyTransform() {
+  stage.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+  $("zoomReadout").textContent = Math.round(scale * 100) + "%";
+}
+function zoomAt(cx, cy, factor) {
+  const next = Math.min(80, Math.max(0.05, scale * factor));
+  tx = cx - (cx - tx) * (next / scale);
+  ty = cy - (cy - ty) * (next / scale);
+  scale = next;
+  applyTransform();
+}
+function fitToViewport() {
+  const art = stage.firstElementChild;
+  if (!art) return;
+  const w = art.getBoundingClientRect().width  / scale;
+  const h = art.getBoundingClientRect().height / scale;
+  if (!w || !h) return;
+  const vw = viewport.clientWidth, vh = viewport.clientHeight;
+  scale = Math.min(vw / w, vh / h) * 0.92;
+  tx = (vw - w * scale) / 2;
+  ty = (vh - h * scale) / 2;
+  applyTransform();
+}
+viewport.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const r = viewport.getBoundingClientRect();
+  zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-e.deltaY * 0.0015));
+}, { passive: false });
+let dragging = false, lastX = 0, lastY = 0;
+viewport.addEventListener("pointerdown", (e) => {
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  viewport.classList.add("dragging");
+  if (viewport.setPointerCapture) viewport.setPointerCapture(e.pointerId);
+});
+viewport.addEventListener("pointermove", (e) => {
+  if (!dragging) return;
+  tx += e.clientX - lastX; ty += e.clientY - lastY;
+  lastX = e.clientX; lastY = e.clientY;
+  applyTransform();
+});
+for (const ev of ["pointerup", "pointercancel"]) {
+  viewport.addEventListener(ev, (e) => {
+    dragging = false; viewport.classList.remove("dragging");
+    if (viewport.hasPointerCapture && viewport.hasPointerCapture(e.pointerId))
+      viewport.releasePointerCapture(e.pointerId);
+  });
+}
+const vpCenter = () => [viewport.clientWidth / 2, viewport.clientHeight / 2];
+$("zoomIn").onclick    = () => zoomAt(...vpCenter(), 1.3);
+$("zoomOut").onclick   = () => zoomAt(...vpCenter(), 1 / 1.3);
+$("zoomFit").onclick   = () => fitToViewport();
+$("zoomReset").onclick = () => { scale = 1; tx = 0; ty = 0; applyTransform(); };
+async function renderSvg(name) {
+  clear(stage);
+  scale = 1; tx = 0; ty = 0; applyTransform();
+  const path = `data/${name}.svg`;
+  const markup = await tryLoadText(path);
+  if (markup && markup.indexOf("<svg") !== -1) {
+    stage.innerHTML = markup;
+    $("svgSrc").textContent = path;
+    requestAnimationFrame(fitToViewport);
+    return;
+  }
+  
+  const ph = el("div", "placeholder",
+    `No ${path} yet — Member 2's renderer produces it. Everything else on this page still works.`);
+  ph.style.margin = "22px";
+  stage.appendChild(ph);
+  $("svgSrc").textContent = "";
+
+  const img = new Image();
+  img.onload = () => {
+    clear(stage);
+    stage.appendChild(img);
+    $("svgSrc").textContent = path + " (via <img>)";
+    requestAnimationFrame(fitToViewport);
+  };
+  img.src = path;
+}
+function renderSource(d) {
+  const lines = d.source.replace(/\n$/, "").split("\n");
+  const width = String(lines.length).length;
+  $("srcPre").textContent = lines
+    .map((l, i) => String(i + 1).padStart(width, " ") + " │ " + l)
+    .join("\n");
+  $("srcCount").textContent = lines.length + " lines";
+}
+function renderAst(d) {
+  const body = $("astBody");
+  clear(body);
+  const a = d.ast;
+  const dl = el("dl", "kv");
+  const row = (k, v) => { dl.appendChild(el("dt", null, k)); dl.appendChild(el("dd", null, v)); };
+  row("name", a.name);
+  row("axiom", JSON.stringify(a.axiom));
+  row("angle", a.angle + "°");
+  row("iterations", String(a.iterations));
+  row("step", String(a.step));
+  row("start", `(${a.startX}, ${a.startY})`);
+  row("heading", a.heading + "°");
+  body.appendChild(dl);
+  const h = el("h3", null, "rules");
+  h.style.cssText = "margin:13px 0 5px;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted)";
+  body.appendChild(h);
+  if (!a.rules.length) { body.appendChild(el("div", "note", "no rules")); return; }
+  const t = el("table");
+  const thead = el("thead");
+  const hr = el("tr");
+  ["symbol", "→", "production", "weight"].forEach((c) => hr.appendChild(el("th", "mono", c)));
+  thead.appendChild(hr); t.appendChild(thead);
+  const tb = el("tbody");
+  for (const r of a.rules) {
+    r.productions.forEach((p, i) => {
+      const tr = el("tr");
+      tr.appendChild(el("td", "mono", i === 0 ? r.symbol : ""));
+      tr.appendChild(el("td", "mono", i === 0 ? "→" : "|"));
+      tr.appendChild(el("td", "mono", p.text));
+      tr.appendChild(el("td", "num", String(p.weight)));
+      tb.appendChild(tr);
+    });
+  }
+  t.appendChild(tb);
+  body.appendChild(t);
+}
+const TOK_CHUNK = 250;
+let tokShowAll = false;
+function renderTokens(d) {
+  const body = $("tokBody");
+  clear(body);
+  const toks = d.tokens;
+  $("tokCount").textContent = fmt(toks.length) + " tokens";
+  const shown = tokShowAll ? toks.length : Math.min(TOK_CHUNK, toks.length);
+  const t = el("table");
+  const thead = el("thead"), hr = el("tr");
+  ["line", "kind", "text", "value"].forEach((c) => hr.appendChild(el("th", null, c)));
+  thead.appendChild(hr); t.appendChild(thead);
+  const tb = el("tbody");
+  for (let i = 0; i < shown; i++) {
+    const tk = toks[i], tr = el("tr");
+    tr.appendChild(el("td", "num", String(tk.line)));
+    tr.appendChild(el("td", "mono", tk.kind));
+    tr.appendChild(el("td", "mono", tk.text));
+    tr.appendChild(el("td", "num", tk.num === undefined ? "" : String(tk.num)));
+    tb.appendChild(tr);
+  }
+  t.appendChild(tb);
+  body.appendChild(t);
+  const more = $("tokMore");
+  more.hidden = toks.length <= TOK_CHUNK;
+  more.textContent = tokShowAll ? "show first " + TOK_CHUNK : `show all ${fmt(toks.length)}`;
+}
+$("tokMore").onclick = () => { tokShowAll = !tokShowAll; renderTokens(data); };
+const IR_CHUNK = 400;
+let irShown = IR_CHUNK;
+function renderIr(d) {
+  const body = $("irBody");
+  clear(body);
+  const p = d.program;
+  $("irCount").textContent =
+    fmt(d.programLength) + " commands" + (d.programTruncated ? ` (first ${fmt(p.length)} in file)` : "");
+  const n = Math.min(irShown, p.length);
+  const lines = [];
+  for (let i = 0; i < n; i++) lines.push(String(i).padStart(6, " ") + "  " + p[i].op.padEnd(11, " ") + p[i].arg);
+  const pre = el("pre", "code");
+  pre.textContent = lines.join("\n") || "(empty)";
+  body.appendChild(pre);
+  const more = $("irMore");
+  more.hidden = p.length <= IR_CHUNK;
+  more.textContent = n >= p.length ? "show fewer" : `show more (${fmt(n)} / ${fmt(p.length)})`;
+}
+$("irMore").onclick = () => {
+  const p = data.program;
+  irShown = irShown >= p.length ? IR_CHUNK : Math.min(p.length, irShown + 2000);
+  renderIr(data);
+};
+let expandFull = false;
+function renderExpanded(d) {
+  const e = d.expanded;
+  $("expCount").textContent = fmt(e.fullLength) + " symbols";
+  const btn = $("expToggle");
+  if (!e.truncated) {
+    $("expPre").textContent = e.full !== null ? e.full : e.preview;
+    btn.hidden = true;
+    return;
+  }
+  btn.hidden = false;
+  if (e.full === null) {
+    $("expPre").textContent = e.preview + " …";
+    btn.hidden = true;
+    $("expCount").textContent += " — too large to embed, use fr_frontend --expand";
+    return;
+  }
+  if (expandFull) {
+    $("expPre").textContent = e.full;
+    btn.textContent = "show preview";
+  } else {
+    $("expPre").textContent = e.preview + " …";
+    btn.textContent = `show full (${fmt(e.fullLength)} chars)`;
+  }
+}
+$("expToggle").onclick = () => { expandFull = !expandFull; renderExpanded(activeFrame || data); };
+function barGroup(title, entries, labelFn) {
+  const g = el("div", "statgroup");
+  g.appendChild(el("h3", null, title));
+  const max = entries.reduce((m, [, v]) => Math.max(m, v), 0) || 1;
+  const grid = el("div", "bars");
+  for (const [k, v] of entries) {
+    grid.appendChild(el("div", "lbl", labelFn(k)));
+    const track = el("div", "track");
+    const fill = el("div", "fill");
+    fill.style.width = (v / max * 100).toFixed(2) + "%";
+    track.appendChild(fill);
+    grid.appendChild(track);
+    grid.appendChild(el("div", "val", fmt(v)));
+  }
+  g.appendChild(grid);
+  return g;
+}
+const SYMBOL_HELP = {
+  "F": "F  draw", "G": "G  draw", "f": "f  move (pen up)",
+  "+": "+  turn left", "-": "-  turn right",
+  "[": "[  push", "]": "]  pop"
+};
+function renderStats(d) {
+  const body = $("statBody");
+  clear(body);
+  const sym = Object.entries(d.stats.symbolCounts).sort((a, b) => b[1] - a[1]);
+  const ops = Object.entries(d.stats.opCounts).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  body.appendChild(barGroup("symbols in expanded string", sym, (k) => SYMBOL_HELP[k] || k));
+  body.appendChild(ops.length
+    ? barGroup("turtle ops emitted", ops, (k) => k)
+    : el("div", "note", "no commands emitted"));
+  if (d.stats.maxDepth)
+    body.appendChild(el("div", "note", `max branch depth: ${d.stats.maxDepth} nested '['`));
+}
+async function setupIterations(demo) {
+  frames = demo.iterationFrames || 0;
+  activeFrame = null;
+  const panel = $("iterPanel");
+  if (frames <= 0) { panel.hidden = true; return; }
+  panel.hidden = false;
+  const range = $("iterRange");
+  range.max = String(frames);
+  range.value = String(frames);
+  $("iterLabel").textContent = `n = ${frames}`;
+  $("iterNote").textContent = `${frames + 1} pre-generated frames`;
+}
+$("iterRange").oninput = async (e) => {
+  const k = Number(e.target.value);
+  $("iterLabel").textContent = `n = ${k}`;
+  const frame = k === frames ? null : await tryLoadJson(`data/${current}_it${k}.json`);
+  if (k !== frames && !frame) { $("iterLabel").textContent = `n = ${k} (frame missing)`; return; }
+  activeFrame = frame;
+  const d = frame || data;
+  renderExpanded(d);
+  renderStats(d);
+};
+let llMode = "raw";
+let llRaw = null, llOpt = null;
+
+function alignLines(A, B) {
+  const n = A.length, m = B.length;
+  const rows = [];
+  if ((n + 1) * (m + 1) > 6e6) {
+    for (let i = 0; i < Math.max(n, m); i++)
+      rows.push({ l: i < n ? A[i] : null, r: i < m ? B[i] : null, same: A[i] === B[i] });
+    return rows;
+  }
+  const w = m + 1;
+  const dp = new Int32Array((n + 1) * w);
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--)
+      dp[i * w + j] = A[i] === B[j]
+        ? dp[(i + 1) * w + j + 1] + 1
+        : Math.max(dp[(i + 1) * w + j], dp[i * w + j + 1]);
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (A[i] === B[j])                       { rows.push({ l: A[i], r: B[j], same: true }); i++; j++; }
+    else if (dp[(i + 1) * w + j] >= dp[i * w + j + 1]) { rows.push({ l: A[i], r: null, same: false }); i++; }
+    else                                     { rows.push({ l: null, r: B[j], same: false }); j++; }
+  }
+  while (i < n) rows.push({ l: A[i++], r: null, same: false });
+  while (j < m) rows.push({ l: null, r: B[j++], same: false });
+  return rows;
+}
+function preOf(rows, side, cls) {
+  const pre = el("pre", "code");
+  for (const r of rows) {
+    const line = side === "l" ? r.l : r.r;
+    const klass = line === null ? "diffline gap" : "diffline" + (r.same ? "" : " " + cls);
+    pre.appendChild(el("span", klass, (line === null ? "" : line) + "\n"));
+  }
+  return pre;
+}
+function renderLl() {
+  const body = $("llBody");
+  clear(body);
+  $("llModeRaw").setAttribute("aria-pressed", String(llMode === "raw"));
+  $("llModeOpt").setAttribute("aria-pressed", String(llMode === "opt"));
+  $("llModeDiff").setAttribute("aria-pressed", String(llMode === "diff"));
+  if (!llRaw && !llOpt) {
+    $("llCount").textContent = "";
+    placeholder(body,
+      `No data/${current}.ll or data/${current}.opt.ll yet — Member 2 emits these with ` +
+      `--emit-llvm. This panel lights up on its own once the files are in viewer/data/.`);
+    return;
+  }
+  if (llMode === "diff" && llRaw && llOpt) {
+    const A = llRaw.split("\n"), B = llOpt.split("\n");
+    const rows = alignLines(A, B);
+    const removed = rows.filter((r) => r.l !== null && !r.same).length;
+    const added   = rows.filter((r) => r.r !== null && !r.same).length;
+    $("llCount").textContent =
+      `${fmt(A.length)} → ${fmt(B.length)} lines · ${removed} removed, ${added} added`;
+    const grid = el("div", "diffgrid");
+    const left = el("div"), right = el("div");
+    left.appendChild(el("h3", null, `${current}.ll  (-O0)`));
+    left.appendChild(preOf(rows, "l", "changed-l"));
+    right.appendChild(el("h3", null, `${current}.opt.ll  (optimized)`));
+    right.appendChild(preOf(rows, "r", "changed-r"));
+    grid.appendChild(left); grid.appendChild(right);
+    body.appendChild(grid);
+    return;
+  }
+  const want = llMode === "opt" ? llOpt : llRaw;
+  const label = llMode === "opt" ? `${current}.opt.ll` : `${current}.ll`;
+  if (!want) { $("llCount").textContent = ""; placeholder(body, `No data/${label} yet.`); return; }
+  $("llCount").textContent = `${label} — ${fmt(want.split("\n").length)} lines`;
+  const pre = el("pre", "code");
+  pre.textContent = want;
+  body.appendChild(pre);
+}
+$("llModeRaw").onclick  = () => { llMode = "raw";  renderLl(); };
+$("llModeOpt").onclick  = () => { llMode = "opt";  renderLl(); };
+$("llModeDiff").onclick = () => { llMode = "diff"; renderLl(); };
+document.querySelectorAll("[data-collapse]").forEach((btn) => {
+  btn.onclick = () => {
+    const target = $(btn.dataset.collapse);
+    const hide = !target.hidden;
+    target.hidden = hide;
+    btn.setAttribute("aria-pressed", String(hide));
+    btn.textContent = hide ? "expand" : "collapse";
+  };
+});
+document.querySelectorAll("[data-copy]").forEach((btn) => {
+  btn.onclick = async () => {
+    const d = activeFrame || data;
+    if (!d) return;
+    const text = btn.dataset.copy === "source"
+      ? d.source
+      : (d.expanded.full !== null ? d.expanded.full : d.expanded.preview);
+    const done = () => { const o = btn.textContent; btn.textContent = "copied"; setTimeout(() => (btn.textContent = o), 1100); };
+    try {
+      await navigator.clipboard.writeText(text);
+      done();
+    } catch (err) {
+      const ta = el("textarea");
+      ta.value = text;
+      ta.style.cssText = "position:fixed;opacity:0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); done(); } catch (e2) { btn.textContent = "copy failed"; }
+      ta.remove();
+    }
+  };
+});
+async function selectDemo(name) {
+  current = name;
+  for (const t of document.querySelectorAll(".tab"))
+    t.setAttribute("aria-selected", String(t.dataset.name === name));
+  const d = await tryLoadJson(`data/${name}.json`);
+  if (!d) {
+    showBanner(`Could not load <code>data/${name}.json</code>. Run <code>.\\viewer\\build_demos.ps1</code> to generate it.`);
+    return;
+  }
+  data = d;
+  tokShowAll = false; irShown = IR_CHUNK; expandFull = false;
+
+  renderSource(d); renderAst(d); renderTokens(d); renderIr(d); renderExpanded(d); renderStats(d);
+  await setupIterations(demos.find((x) => x.name === name) || { name });
+  await renderSvg(name);
+  llRaw = await tryLoadText(`data/${name}.ll`);
+  llOpt = await tryLoadText(`data/${name}.opt.ll`);
+  if (llMode === "opt" && !llOpt) llMode = "raw";
+  renderLl();
+  try { history.replaceState(null, "", "#" + name); } catch (e) {  }
+}
+function showBanner(html) { const b = $("banner"); b.hidden = false; b.innerHTML = html; }
+
+(async function init() {
+  $("modeBadge").textContent = BUNDLE ? "bundle.js" : location.protocol.replace(":", "") + " + fetch";
+  let manifest = await tryLoadJson("manifest.json");
+  if (!manifest) {
+    $("modeBadge").textContent = "no data";
+    showBanner(
+      location.protocol === "file:"
+        ? "Opened from <code>file://</code> and no <code>data/bundle.js</code> was found. " +
+          "Browsers block <code>fetch()</code> on local files, so run " +
+          "<code>powershell .\\viewer\\pack.ps1</code> once to pack the artifacts into " +
+          "<code>data/bundle.js</code> — then this page works offline by double-click. " +
+          "(Serving the folder over http works too.)"
+        : "Could not load <code>viewer/manifest.json</code>. Run <code>.\\viewer\\build_demos.ps1</code>.");
+    placeholder($("astBody"), "no data loaded");
+    placeholder($("tokBody"), "no data loaded");
+    placeholder($("irBody"),  "no data loaded");
+    placeholder($("statBody"),"no data loaded");
+    await renderSvg("none");
+    return;
+  }
+  demos = (manifest.demos || []).map((d) => (typeof d === "string" ? { name: d } : d));
+  if (!demos.length) { showBanner("manifest.json lists no demos."); return; }
+  const tabs = $("tabs");
+  for (const d of demos) {
+    const b = el("button", "tab", d.name);
+    b.dataset.name = d.name;
+    b.setAttribute("role", "tab");
+    b.onclick = () => selectDemo(d.name);
+    tabs.appendChild(b);
+  }
+  const fromHash = decodeURIComponent(location.hash.replace("#", ""));
+  await selectDemo(demos.some((d) => d.name === fromHash) ? fromHash : demos[0].name);
+})().catch((err) => {
+  showBanner("Viewer error: <code>" + String(err && err.message || err) + "</code>");
+  $("modeBadge").textContent = "error";
+});
+</script>
+</body>
+</html>

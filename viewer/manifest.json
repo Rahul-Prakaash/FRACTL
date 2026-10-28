@@ -1,0 +1,11 @@
+{
+  "generated": "2026-10-14T11:15:51",
+  "demos": [
+    { "name": "triangle", "iterationFrames": 0 },
+    { "name": "koch", "iterationFrames": 4 },
+    { "name": "dragon", "iterationFrames": 12 },
+    { "name": "plant", "iterationFrames": 6 },
+    { "name": "tree", "iterationFrames": 7 },
+    { "name": "carpet", "iterationFrames": 4 }
+  ]
+}

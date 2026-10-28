@@ -1,0 +1,12 @@
+{
+  "name": "fractl-viewer-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Headless smoke test for viewer/index.html. The viewer itself has no dependencies; jsdom is only needed to test it.",
+  "scripts": {
+    "test": "node smoke_viewer.js .."
+  },
+  "devDependencies": {
+    "jsdom": "^24.0.0"
+  }
+}

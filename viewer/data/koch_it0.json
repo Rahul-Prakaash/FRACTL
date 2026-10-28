@@ -1,0 +1,81 @@
+{
+  "name": "koch_it0",
+  "source": "\nfractal Koch {\n    axiom: \"F--F--F\";\n\n    rules {\n        F -> \"F+F--F+F\";\n    }\n\n    angle: 60;\n    iterations: 4;\n    step: 4;\n    start: (150, 350);\n    heading: 0;\n}\n",
+  "tokens": [
+    {"line": 2, "kind": "fractal", "text": "fractal"},
+    {"line": 2, "kind": "identifier", "text": "Koch"},
+    {"line": 2, "kind": "{", "text": "{"},
+    {"line": 3, "kind": "axiom", "text": "axiom"},
+    {"line": 3, "kind": ":", "text": ":"},
+    {"line": 3, "kind": "string", "text": "F--F--F"},
+    {"line": 3, "kind": ";", "text": ";"},
+    {"line": 5, "kind": "rules", "text": "rules"},
+    {"line": 5, "kind": "{", "text": "{"},
+    {"line": 6, "kind": "identifier", "text": "F"},
+    {"line": 6, "kind": "->", "text": "->"},
+    {"line": 6, "kind": "string", "text": "F+F--F+F"},
+    {"line": 6, "kind": ";", "text": ";"},
+    {"line": 7, "kind": "}", "text": "}"},
+    {"line": 9, "kind": "angle", "text": "angle"},
+    {"line": 9, "kind": ":", "text": ":"},
+    {"line": 9, "kind": "number", "text": "60", "num": 60},
+    {"line": 9, "kind": ";", "text": ";"},
+    {"line": 10, "kind": "iterations", "text": "iterations"},
+    {"line": 10, "kind": ":", "text": ":"},
+    {"line": 10, "kind": "number", "text": "4", "num": 4},
+    {"line": 10, "kind": ";", "text": ";"},
+    {"line": 11, "kind": "step", "text": "step"},
+    {"line": 11, "kind": ":", "text": ":"},
+    {"line": 11, "kind": "number", "text": "4", "num": 4},
+    {"line": 11, "kind": ";", "text": ";"},
+    {"line": 12, "kind": "start", "text": "start"},
+    {"line": 12, "kind": ":", "text": ":"},
+    {"line": 12, "kind": "(", "text": "("},
+    {"line": 12, "kind": "number", "text": "150", "num": 150},
+    {"line": 12, "kind": ",", "text": ","},
+    {"line": 12, "kind": "number", "text": "350", "num": 350},
+    {"line": 12, "kind": ")", "text": ")"},
+    {"line": 12, "kind": ";", "text": ";"},
+    {"line": 13, "kind": "heading", "text": "heading"},
+    {"line": 13, "kind": ":", "text": ":"},
+    {"line": 13, "kind": "number", "text": "0", "num": 0},
+    {"line": 13, "kind": ";", "text": ";"},
+    {"line": 14, "kind": "}", "text": "}"},
+    {"line": 15, "kind": "end of file", "text": ""}
+  ],
+  "ast": {
+    "name": "Koch",
+    "axiom": "F--F--F",
+    "rules": [
+      {"symbol": "F", "productions": [{"weight": 1, "text": "F+F--F+F"}]}
+    ],
+    "angle": 60,
+    "iterations": 0,
+    "step": 4,
+    "startX": 150,
+    "startY": 350,
+    "heading": 0
+  },
+  "expanded": {
+    "preview": "F--F--F",
+    "fullLength": 7,
+    "truncated": false,
+    "full": "F--F--F"
+  },
+  "program": [
+    {"op": "FORWARD", "arg": 4},
+    {"op": "TURN_RIGHT", "arg": 60},
+    {"op": "TURN_RIGHT", "arg": 60},
+    {"op": "FORWARD", "arg": 4},
+    {"op": "TURN_RIGHT", "arg": 60},
+    {"op": "TURN_RIGHT", "arg": 60},
+    {"op": "FORWARD", "arg": 4}
+  ],
+  "programLength": 7,
+  "programTruncated": false,
+  "stats": {
+    "symbolCounts": {"-": 4, "F": 3},
+    "opCounts": {"FORWARD": 3, "MOVE": 0, "TURN_LEFT": 0, "TURN_RIGHT": 4, "PUSH": 0, "POP": 0, "BLADE": 0, "PITCH_DOWN": 0, "PITCH_UP": 0, "ROLL_LEFT": 0, "ROLL_RIGHT": 0, "THIN": 0, "NEXT_COLOR": 0},
+    "maxDepth": 0
+  }
+}
