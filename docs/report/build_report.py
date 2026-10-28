@@ -294,7 +294,8 @@ S += [H1("6. Conclusion"),
       P("The key design result is recursive code generation. It keeps the generated IR the size of the grammar (531 lines against 201,463 for the meadow scene) while producing byte-identical drawings. Stochastic rules with a shared random generator keep the output reproducible, and the automated test suite (79,580 frontend checks, plus golden files for every demo) keeps earlier stages from regressing."),
       P("Known limits: parametric L-systems (`F(x)`) and context-sensitive rules are not supported, leaves are blades rather than arbitrary polygons, and 3D drawings beyond a few hundred thousand segments make the browser slow to upload. Natural extensions are parametric rules, richer leaf geometry and more optimization passes."),
       H1("7. Project Repository Link"),
-      P("(To be added.)")]
+      Paragraph('<link href="https://github.com/Rahul-Prakaash/FRACTL" color="#2E5597"><u>https://github.com/Rahul-Prakaash/FRACTL</u></link>', st["p"]),
+      P("The README in the repository lists the requirements and the commands to build, test and run the compiler and FRACTL Studio.")]
 
 doc.build(S)
 print("ok")
