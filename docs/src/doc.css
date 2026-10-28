@@ -1,0 +1,43 @@
+@page { size: A4; margin: 16mm 15mm 16mm 15mm; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #fbf9f3; color: #232323; font: 10.5pt/1.5 Arial, Helvetica, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.kicker { font: bold 8.5pt "Courier New", monospace; letter-spacing: 0.12em; color: #b3532e; margin: 0 0 6px; }
+h1 { font-size: 25pt; line-height: 1.1; margin: 0 0 8px; text-align: center; }
+.sub { text-align: center; color: #6b6b6b; font-size: 11.5pt; margin: 0 0 14px; }
+.band { background: #efe6dc; border-radius: 3px; padding: 9px 13px; font-size: 9.5pt; margin: 10px 0 16px; }
+.band b { color: #333; }
+h2 { font-size: 15pt; margin: 22px 0 6px; padding-top: 2px; break-after: avoid; }
+h2 .n { color: #b3532e; font-family: "Courier New", monospace; font-size: 12pt; margin-right: 6px; }
+h3 { font-size: 11.5pt; margin: 14px 0 4px; break-after: avoid; }
+p { margin: 5px 0 8px; }
+ul, ol { margin: 4px 0 8px 0; padding-left: 20px; }
+li { margin: 2px 0; }
+code { font: 9pt "Courier New", monospace; background: #f0ebe1; padding: 0 3px; border-radius: 2px; }
+pre { background: #1e1e1e; color: #e4e4e4; font: 8.4pt/1.45 "Courier New", monospace; padding: 10px 14px; border-radius: 3px; white-space: pre-wrap; break-inside: avoid; margin: 8px 0 10px; }
+pre .c { color: #8f9b8f; }
+pre .k { color: #f0b27a; }
+table { width: 100%; border-collapse: collapse; margin: 8px 0 12px; font-size: 9.3pt; break-inside: avoid; }
+th { text-align: left; font-size: 8.5pt; color: #6b6b6b; border-bottom: 1.5px solid #ddd3c4; padding: 5px 6px; }
+td { border-bottom: 1px solid #e6dfd2; padding: 5px 6px; vertical-align: top; }
+td code { font-size: 8.4pt; }
+.say, .why, .new { break-inside: avoid; border-left: 4px solid; padding: 7px 12px; margin: 10px 0 12px; border-radius: 0 3px 3px 0; font-size: 9.8pt; }
+.say { border-color: #3c8d5a; background: #eef5ee; }
+.why { border-color: #b3532e; background: #f6ece3; }
+.new { border-color: #4a6fa5; background: #ecf1f8; }
+.say .t, .why .t, .new .t { display: block; font: bold 8pt "Courier New", monospace; letter-spacing: 0.1em; margin-bottom: 3px; }
+.say .t { color: #2f6e46; } .why .t { color: #b3532e; } .new .t { color: #3a5a8a; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 12px; break-inside: avoid; }
+.box { background: #fff; border: 1px solid #e6dfd2; border-radius: 4px; padding: 8px 11px; font-size: 9.5pt; }
+.box b { display: block; margin-bottom: 2px; }
+.qa { break-inside: avoid; margin: 7px 0; }
+.qa .q { font-weight: bold; }
+.qa .a { margin-left: 14px; color: #333; }
+.nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 8px 0 12px; break-inside: avoid; }
+.num { background: #fff; border: 1px solid #e6dfd2; border-radius: 4px; padding: 7px 9px; text-align: center; }
+.num b { display: block; font-size: 15pt; color: #b3532e; }
+.num span { font-size: 8.5pt; color: #555; }
+.foot { margin-top: 20px; padding-top: 8px; border-top: 1px solid #ddd3c4; font-size: 8pt; color: #777; }
+.pb { break-before: page; }
+.tag { display: inline-block; font: bold 7.5pt Arial; padding: 1px 6px; border-radius: 9px; vertical-align: 1px; }
+.tag.s2 { background: #e2ecdf; color: #2f6e46; }
+.tag.s3 { background: #dfe6f2; color: #3a5a8a; }

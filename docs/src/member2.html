@@ -1,0 +1,158 @@
+<!doctype html><html><head><meta charset="utf-8"><title>FRACTL Member 2 - Backend, Stages 2-3</title><link rel="stylesheet" href="doc.css"></head><body>
+
+<p class="kicker">FRACTL · STAGES 2–3 · MEMBER 2</p>
+<h1>Backend: Smaller Code, Faster Builds, a 3D Turtle</h1>
+<p class="sub">How the backend went from "one call per line drawn" to "one function per grammar rule", learned to compile in memory,
+and grew a 3D runtime — and why every old picture still comes out identical.</p>
+<div class="band"><b>Pipeline:</b> turtle IR / grammar → LLVM IR (<b>recursive</b> or unrolled) → [--opt] → <b>ORC JIT in memory</b> or .o + link →
+runtime.c (2D SVG or <b>3D .f3d stream</b>)</div>
+
+<div class="say"><span class="t">IN ONE BREATH</span>
+Stage 1 wrote one LLVM call for every single line of the drawing, so bigger pictures meant bigger, slower programs.
+Now the compiler writes <b>one LLVM function per grammar rule</b> that calls itself — the code is the size of the grammar, not the picture.
+LLVM's <b>JIT</b> turns it into machine code in memory and runs it straight away, and the runtime can draw in <b>3D</b>.
+The full meadow — 40,000 pieces — compiles and runs in about a tenth of a second.</div>
+
+<h2><span class="n">01</span>What changed since Stage 1</h2>
+<table>
+<tr><th style="width:20%">Area</th><th style="width:27%">Stage 1</th><th>Now</th></tr>
+<tr><td>Runtime</td><td>one continuous line; no move/push/pop</td><td><span class="tag s2">Stage 2</span> pen-up moves, a growable save/restore stack, one polyline per stroke<br><span class="tag s3">Stage 3</span> a full 3D turtle writing a <code>.f3d</code> segment stream; a seeded random-number function</td></tr>
+<tr><td>Code generation</td><td>unrolled: one call per command</td><td><span class="tag s3">Stage 3</span> <b>recursive</b>: one function per rule symbol (default); unrolled kept as <code>--unroll</code></td></tr>
+<tr><td>Running it</td><td>.o file + <code>gcc</code> link + run</td><td><span class="tag s3">Stage 3</span> also <b>LLVM ORC JIT</b> (<code>--jit</code>): no file, no linker</td></tr>
+<tr><td>Optimizer</td><td>none</td><td><span class="tag s3">Stage 3</span> <code>--opt</code>: merges neighbouring turns</td></tr>
+<tr><td>Scenes</td><td>—</td><td><span class="tag s3">Stage 3</span> instance table + loop + switch inside <code>fractl_main</code></td></tr>
+<tr><td>Driver flags</td><td><code>-o --svg --emit-ir</code></td><td>+ <code>--jit --unroll --opt --out --timings --ir-only</code></td></tr>
+<tr><td>Distribution</td><td>needs LLVM installed</td><td>one <b>fully static</b> <code>fractlc</code> with LLVM inside — runs on any WSL</td></tr>
+</table>
+
+<h2><span class="n">02</span>Stage 2: the runtime learns to branch <span class="tag s2">Stage 2</span></h2>
+<p>Stage 1's codegen already emitted <code>turtle_move</code>, <code>turtle_push</code> and <code>turtle_pop</code> — Stage 2 only had to make the runtime implement them.</p>
+<ul>
+<li><b>Save/restore stack</b>: <code>turtle_push()</code> copies the turtle state onto a stack that doubles in size when full (tested 5,000 levels deep); <code>turtle_pop()</code> restores it. A pop with nothing saved stops with <code>state stack underflow</code>.</li>
+<li><b>Strokes</b>: a pen-up move or a pop starts a new <code>&lt;polyline&gt;</code>. A push does <i>not</i> lift the pen, so a branch continues the line it starts from — the plant's 6,048 segments need only 2,048 polylines.</li>
+<li><b>Stage 1 untouched</b>: same real-size SVG, same number format; triangle and Koch come out <b>byte-identical</b> to Stage 1 (tested).</li>
+</ul>
+
+<h2><span class="n">03</span>Recursive code generation — the big idea <span class="tag s3">Stage 3</span></h2>
+<p><b>The problem.</b> Unrolled code grows with the picture: the Stage 2 plant was 21,063 calls in a single function, a 1 MB object file.
+A meadow with a tree and 1,300 tufts would be 200,000 lines of LLVM IR.</p>
+<p><b>The idea.</b> An L-system is naturally recursive: "X becomes F+[[X]-X]…" means <i>draw X by drawing F, turning, then drawing X again,
+one level deeper</i>. So each rule symbol becomes an LLVM function that takes <code>d</code> = how many rewrite passes are left:</p>
+<pre><span class="k">define internal void</span> @Plant.X(i32 %d) {
+entry:
+  %done = icmp eq i32 %d, 0              <span class="c">; no passes left?</span>
+  br i1 %done, label %leaf, label %grow
+leaf:                                     <span class="c">; X draws nothing at the last level</span>
+  ret void
+grow:
+  %next = sub i32 %d, 1
+  call void @Plant.F(i32 %next)           <span class="c">; X -&gt; "F+[[X]-X]-F[-FX]+X"</span>
+  call void @turtle_turn(double 2.500000e+01)
+  call void @turtle_push()
+  call void @turtle_push()
+  call void @Plant.X(i32 %next)           <span class="c">; recursion, one level deeper</span>
+  call void @turtle_pop()
+  …</pre>
+<p>The axiom becomes a small function that calls the rule functions with <code>d = iterations</code>. Symbols with no rule are drawn on the spot
+(the shared <code>terminalCmd()</code> from Member 1 says what each symbol draws).</p>
+
+<h3>Random rules in LLVM IR</h3>
+<p>A symbol with several weighted productions asks the runtime for a number and branches — exactly the arithmetic Member 1's rewriter does at compile time:</p>
+<pre>grow:
+  %level = sub i32 2, %d                  <span class="c">; which rewrite pass this is</span>
+  %r = call double @fractl_rand(i32 %level)
+  %x = fmul double %r, 1.000000e+00       <span class="c">; × total weight</span>
+  %0 = fcmp olt double %x, 3.000000e-01   <span class="c">; first production's share</span>
+  br i1 %0, label %p0, label %t1          <span class="c">; p0 = production 0, t1 = test the next</span></pre>
+
+<table>
+<tr><th>Program</th><th>Unrolled IR</th><th>Recursive IR</th><th>Object file</th><th>Object emit time</th></tr>
+<tr><td>Stage 2 plant</td><td>21,086 lines</td><td><b>70 lines</b></td><td>1.0 MB → <b>2.7 KB</b></td><td>0.88 s → 0.08 s</td></tr>
+<tr><td>Dragon</td><td>12,309 lines</td><td><b>60 lines</b></td><td>751 KB → <b>2.5 KB</b></td><td>0.44 s → 0.17 s</td></tr>
+<tr><td>Meadow (1,301 instances)</td><td>201,463 lines</td><td><b>531 lines</b></td><td>11.9 MB → <b>91 KB</b></td><td>4.58 s → 0.17 s</td></tr>
+</table>
+<div class="say"><span class="t">SAY IT LIKE THIS</span>
+"Stage 2 compiled the picture. Stage 3 compiles the grammar. The plant went from 21,000 lines of IR to 70, and the drawing is byte-for-byte the same."</div>
+
+<h2><span class="n">04</span>Scenes: a table and a loop <span class="tag s3">Stage 3</span></h2>
+<p>Placing 1,301 copies with 1,301 separate call sequences would undo the savings. Instead the instance list from Member 1's scene layout
+becomes a <b>constant table</b> in the module, and <code>fractl_main</code> is a real loop:</p>
+<pre>instance:                                       <span class="c">; for i in 0 .. 1300</span>
+  %i   = phi i64 [ 0, %entry ], [ %i.next, %next ]
+  %row = getelementptr [1301 x %instance], ptr @instances, i64 0, i64 %i
+  …  load x, y, z, yaw, scale, seed, fractal  …
+  switch i32 %fractal, label %next [ i32 0, label %grow.Tree
+                                     i32 1, label %grow.Tuft ]
+grow.Tuft:
+  call void @turtle3_begin(… position, yaw, scale, width, taper …)
+  call void @fractl_seed(i64 %seed)             <span class="c">; this copy's own randomness</span>
+  call void @Tuft.axiom()
+  call void @turtle3_end()</pre>
+<p>Uses LLVM <b>struct types, a global constant array, a phi node, GEP, loads and a switch</b> — real control flow, not just calls.</p>
+
+<h2><span class="n">05</span>The <code>--opt</code> peephole pass <span class="tag s3">Stage 3</span></h2>
+<p><code>Backend::foldTurns()</code> walks every basic block and merges <b>directly adjacent</b> calls to the same rotation with constant angles:
+<code>turn(-60); turn(-60)</code> → <code>turn(-120)</code>. If a run adds up to a whole turn (a multiple of 360°) it is deleted completely.</p>
+<ul>
+<li>It never merges across a draw, a move or a push/pop — those change where the turn applies.</li>
+<li>It never merges <b>different axes</b> (yaw with pitch): 3D rotations don't commute.</li>
+<li>Every demo's drawing is tested to be <b>identical</b> with and without <code>--opt</code>.</li>
+</ul>
+
+<h2><span class="n">06</span>ORC JIT: compile and run in memory <span class="tag s3">Stage 3</span></h2>
+<p><code>jit.cpp</code> uses LLVM's <b>LLJIT</b> (the ORC JIT framework). Instead of writing a <code>.o</code> and calling <code>gcc</code>:</p>
+<ol>
+<li>Create an <code>LLJIT</code> for the host CPU, using the fast instruction selector (<code>-O0</code>) — our code is call sequences with constant arguments, so heavy optimization isn't worth the time.</li>
+<li>Give it the runtime's functions as <b>absolute symbols</b>: <code>runtime.c</code> is linked into <code>fractlc</code> itself, and we tell the JIT the address of every <code>turtle_*</code> function.</li>
+<li><code>addIRModule()</code>, then <code>lookup("fractl_main")</code> — this is the moment LLVM generates machine code in memory.</li>
+<li>Call the returned function pointer. The compiled code runs inside <code>fractlc</code> and writes the drawing.</li>
+</ol>
+<p>Both phases are timed separately for the studio's pipeline panel (meadow: JIT ≈ 7 ms, run ≈ 55 ms).</p>
+<div class="why"><span class="t">SAME OUTPUT, EVERY ROUTE</span>
+Object-file + link and JIT run the very same runtime code, so their outputs are byte-identical — tested for all 17 demos and presets.</div>
+
+<h2><span class="n">07</span>The 3D runtime <span class="tag s3">Stage 3</span></h2>
+<p>The 3D turtle (<code>turtle3_*</code> in <code>runtime.c</code>) keeps a position, the three direction vectors <b>H, L, U</b>, a width and a colour index.</p>
+<ul>
+<li><b>Rotations</b>: turn rotates H and L around U, pitch rotates H and U around L, roll rotates L and U around H. After each rotation the frame
+is re-orthonormalized (H normalized, L made perpendicular, U = H × L) so tiny floating-point errors never pile up.</li>
+<li><b>Instances</b>: <code>turtle3_begin()</code> resets the turtle and records the copy's position, yaw and scale; every segment is converted to world coordinates on the way out.</li>
+<li><b>Output — the <code>.f3d</code> stream</b>: one text line per piece, in exactly the order the program drew it. That order is what the studio uses to show the model being built.</li>
+</ul>
+<pre>o Tuft 12 #2f6b1f,#4f8f2d,#86b84a                       <span class="c">instance name, index, palette</span>
+t x0 y0 z0  x1 y1 z1  radius  colour                    <span class="c">tube (F): wood</span>
+b x0 y0 z0  x1 y1 z1  sx sy sz  width0 width1  colour   <span class="c">blade (G): grass / leaf, with its sideways direction</span></pre>
+<ul>
+<li><b>Randomness</b>: <code>fractl_seed()</code> / <code>fractl_rand(level)</code> keep one counter per rewrite pass and use the same SplitMix64 formula as Member 1's <code>rng.hpp</code> — that is why recursive and unrolled builds choose identically.</li>
+</ul>
+
+<h2><span class="n">08</span>The driver and the static build</h2>
+<pre>fractlc &lt;file.fr&gt; --svg out.svg | --out out.f3d
+        [-o out.o] [--jit] [--emit-ir out.ll] [--unroll] [--opt] [--timings] [--ir-only]</pre>
+<ul>
+<li><code>--timings</code> prints one JSON line with each phase's time — parse, IR generation, optimizer, JIT or object emission, run — which the studio displays live.</li>
+<li><code>--ir-only</code> stops after code generation (the studio's "LLVM IR side by side" uses it).</li>
+<li><b>Static build</b> (<code>make bundle</code>): <code>fractlc</code> is linked with <code>-static</code>, LLVM included, into one 35 MB file with no library dependencies.
+LLVM's support library mentions zstd compression, which FRACTL never uses, so a tiny stub file stands in for it. Result: the presentation laptop needs no LLVM at all.</li>
+</ul>
+
+<h2><span class="n">09</span>Numbers to quote</h2>
+<div class="nums">
+<div class="num"><b>70</b><span>lines of IR for the plant (was 21,086)</span></div>
+<div class="num"><b>531</b><span>lines of IR for the whole meadow (unrolled: 201,463)</span></div>
+<div class="num"><b>~7 ms</b><span>ORC JIT for the meadow</span></div>
+<div class="num"><b>~55 ms</b><span>running it: 39,588 tubes and blades written</span></div>
+<div class="num"><b>0.14 s</b><span>edit → compiled → run → on screen (round trip)</span></div>
+<div class="num"><b>0</b><span>changed pixels in any Stage 1–2 picture</span></div>
+</div>
+
+<h2><span class="n">10</span>Questions you may be asked</h2>
+<div class="qa"><div class="q">Why is recursive code allowed to replace the expanded string?</div><div class="a">Rewriting all passes and then drawing gives the same sequence as drawing depth-first while recursing: each recursive call is "this symbol, expanded the remaining number of times". The tests compare both outputs byte for byte.</div></div>
+<div class="qa"><div class="q">What does the JIT actually do that the old path didn't?</div><div class="a">It skips the object file, the linker and the executable: LLVM produces machine code directly into memory inside <code>fractlc</code>, and we call it like a normal function.</div></div>
+<div class="qa"><div class="q">Is the IR verified?</div><div class="a">Yes — <code>verifyModule()</code> runs after code generation and again before object emission.</div></div>
+<div class="qa"><div class="q">Why -O0 for the JIT?</div><div class="a">The generated functions are short call sequences with constants; optimization would cost more time than it saves. The fast selector made the JIT step several times quicker with identical output.</div></div>
+<div class="qa"><div class="q">Why can't <code>--opt</code> merge a pitch with a yaw?</div><div class="a">Rotations about different axes don't commute: pitch-then-yaw points the turtle somewhere different from yaw-then-pitch.</div></div>
+<div class="qa"><div class="q">How do you know the runtime's 3D maths is right?</div><div class="a">The runtime unit tests check exact coordinates after turns, pitches, push/pop and instance rotation and scaling (36 runtime checks).</div></div>
+
+<p class="foot">FRACTL Stages 2–3 · backend (Member 2) · codegen.hpp, codegen.cpp, emit_object.cpp, jit.cpp, runtime.c, runtime.h, fractlc.cpp, tools/zstd_stub.c</p>
+</body></html>

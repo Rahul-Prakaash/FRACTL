@@ -1,0 +1,130 @@
+<!doctype html><html><head><meta charset="utf-8"><title>FRACTL Member 3 - Tooling, Verification and Studio, Stages 2-3</title><link rel="stylesheet" href="doc.css"><style>body{font-size:10.2pt} .foot{margin-top:10px} pre{padding:8px 12px}</style></head><body>
+
+<p class="kicker">FRACTL · STAGES 2–3 · MEMBER 3</p>
+<h1>Tooling, Verification &amp; FRACTL Studio</h1>
+<p class="sub">How the project is built, proven and shown: the live studio with its 2D/3D views and GPU renderer, the tests that prove
+nothing old broke, and the offline bundle for the presentation laptop.</p>
+<div class="band"><b>Flow:</b> editor → studio.py (local server) → real <code>fractlc --jit</code> → .svg / .f3d → browser: Canvas 2D or
+<b>WebGL2 on the GPU</b> → the model grows in drawing order</div>
+
+<div class="say"><span class="t">IN ONE BREATH</span>
+In Stage 1, Member 3's tools showed results the compiler had produced in advance. Now <b>FRACTL Studio</b> compiles whatever you type,
+live, with the real LLVM compiler, and grows the result on screen in the exact order the compiled program drew it — in 2D or in 3D on the GPU,
+with shadows and wind. Every Stage 1 tool is still there, and four test suites prove that all build modes draw identical pictures.</div>
+
+<h2><span class="n">01</span>What changed since Stage 1</h2>
+<table>
+<tr><th style="width:20%">Area</th><th style="width:28%">Stage 1</th><th>Now</th></tr>
+<tr><td>Front end</td><td>web form → SVG; static stage viewer</td><td><span class="tag s3">Stage 3</span> <b>FRACTL Studio</b>: editor, live compiler pipeline with timings, 2D/3D toggle, growth replay, Stages tab, Build log, Form, IR view, export — the old form and viewer are kept too</td></tr>
+<tr><td>Rendering</td><td>browser shows an SVG file</td><td>2D replay with a glowing "turtle"; <b>3D WebGL2 renderer</b> written from scratch (no libraries)</td></tr>
+<tr><td>Tests</td><td>frontend suite, 1,904 checks</td><td><span class="tag s2">Stage 2</span> runtime, pipeline and golden-file suites · <span class="tag s3">Stage 3</span> mode-equivalence suite; frontend now 79,580 checks</td></tr>
+<tr><td>Build</td><td><code>make</code>, <code>make test</code></td><td>generic demo targets, <code>make demo / golden / test / bundle</code></td></tr>
+<tr><td>Delivery</td><td>run from the source folder, LLVM installed</td><td><b>offline bundle</b>: one folder / zip, static binaries, launcher, setup check</td></tr>
+</table>
+
+<h2><span class="n">02</span>Stage 2 tooling <span class="tag s2">Stage 2</span></h2>
+<ul>
+<li><b>New test suites</b>: <code>tests/test_runtime.c</code> (calls the runtime directly and checks exact SVG coordinates), <code>tests/test_pipeline.sh</code> (full
+<code>.fr → fractlc → link → run</code>, bracket errors, and <b>Stage 1 regression</b>: triangle and Koch byte-identical to Stage 1), <code>tests/run_golden.sh</code> (every demo's output and IR compared to saved "golden" copies).</li>
+<li><b>Viewer bug found and fixed</b>: Windows PowerShell's JSON reader treats keys case-insensitively, so <code>"F"</code> and <code>"f"</code> (pen-up) collided and the viewer build crashed on the carpet. Switched to a case-sensitive parser.</li>
+<li><b>Web form</b>: five new presets (plant, tree, bush, weed, carpet) and updated symbol help.</li>
+</ul>
+
+<h2><span class="n">03</span>FRACTL Studio — the server <span class="tag s3">Stage 3</span></h2>
+<p><code>studio.py</code> uses only Python's standard library. Each request writes the editor's text to a real <code>.fr</code> file and runs the real tools:</p>
+<table>
+<tr><th style="width:24%">Endpoint</th><th>What it runs</th></tr>
+<tr><td><code>POST /api/compile</code></td><td><code>fractlc input.fr --jit --out … --emit-ir … --timings</code> (or object + <code>cc</code> + run). Returns the drawing, the IR, each phase's time, and every command's output.</td></tr>
+<tr><td><code>POST /api/inspect</code></td><td><code>fr_frontend --json</code> (optional <code>--fractal</code>, <code>--iterations</code>) — the live Stages tab</td></tr>
+<tr><td><code>POST /api/ir</code></td><td><code>fractlc --ir-only</code> in recursive, unrolled or <code>--opt</code> mode — IR side by side</td></tr>
+<tr><td><code>GET /api/presets</code></td><td>the 17 example grammars</td></tr>
+</table>
+<p><b>Three real-world problems solved along the way:</b></p>
+<ul>
+<li><b>Slow disk</b>: from WSL, reading and writing Windows folders is slow — writing the meadow's output took about 0.3 s instead of 0.04 s.
+The server copies the compiler into Linux <code>/tmp</code> once and builds there.</li>
+<li><b>"localhost" delay</b>: Windows tries IPv6 first for <code>localhost</code>, but WSL forwards IPv4 and IPv6 separately, so every request
+waited 2 s for a fallback. The server listens on <b>both</b>; every address now answers in about 4 ms.</li>
+<li><b>Two builds at once</b> would overwrite each other's files, so builds are serialized with a lock.</li>
+</ul>
+
+<h2><span class="n">04</span>FRACTL Studio — the page <span class="tag s3">Stage 3</span></h2>
+<p>Plain HTML, CSS and JavaScript; no framework, no CDN, no web fonts — it works with the network cable unplugged.</p>
+<table>
+<tr><th style="width:18%">File</th><th>Job</th></tr>
+<tr><td><code>app.js</code></td><td>Editor with syntax highlighting and error-line marking; Build; the <b>compiler pipeline</b> panel (each phase lights up with its measured time); the growth timeline (play, scrub, speed); the <b>2D/3D toggle</b> (each mode keeps its own source and last build); LLVM IR drawer; export to <code>.svg</code> / <code>.obj</code></td></tr>
+<tr><td><code>render2d.js</code></td><td>Replays the SVG stroke by stroke in drawing order; colour runs teal → amber with the drawing order; finished strokes are cached so big curves stay smooth</td></tr>
+<tr><td><code>render3d.js</code></td><td>The 3D renderer (next section)</td></tr>
+<tr><td><code>stages.js</code></td><td>Stage 1 features, live: <b>Stages</b> tab, <b>Build log</b> tab, <b>Form</b> editor</td></tr>
+</table>
+
+<h2><span class="n">05</span>The 3D renderer — how the model "grows" <span class="tag s3">Stage 3</span></h2>
+<p>Written directly against <b>WebGL2</b> (no three.js). The ideas, in order:</p>
+<ol>
+<li><b>Instancing</b>: there is only one small cylinder mesh and one small blade mesh. Each of the ~40,000 pieces is an <i>instance</i>
+— its start, end, radius, colour — so the GPU builds all the geometry in one draw call per kind.</li>
+<li><b>Birth times</b>: each piece gets a time from its position in the <code>.f3d</code> stream. In the vertex shader a piece is invisible before its birth,
+then <b>grows out of its base</b> over a fraction of a second, glowing while it's new. That is the "watch it being built" effect — it replays
+the exact order the compiled program drew. <i>Together</i> mode lets every instance grow at once (grass sprouts while the tree climbs); <i>Emission order</i> is strictly sequential.</li>
+<li><b>Grass</b>: consecutive blade pieces are joined into whole blades; each piece knows how far along its blade it sits. That gives a pointed tip,
+dark-root-to-light-tip shading, occasional dry tips, and <b>wind</b> that bends each blade by the square of that distance (roots stay put).</li>
+<li><b>Light</b>: sky + sun lighting; blades let light through when the sun is behind them; distance fog; the newest piece is marked by a glowing light.</li>
+<li><b>Shadows</b>: a <b>shadow map</b> — the scene is first drawn from the sun into a 2048×2048 depth texture; then each pixel checks whether it is
+hidden from the sun (9 filtered samples for soft edges). The tree shades the grass and the grass shades the ground.</li>
+<li><b>Bark</b>: procedural, in each branch's own coordinates so it wraps without a seam: long fissures, dark cracks, fine grain, moss near the ground.</li>
+</ol>
+<div class="say"><span class="t">SAY IT LIKE THIS</span>
+"The browser never invents geometry. It receives the exact list of pieces the compiled program wrote, in the order it wrote them, and the GPU grows
+each one at its moment. On this laptop's integrated Intel graphics that's 40,000 pieces with shadows and wind at 60 frames per second."</div>
+
+<h2><span class="n">06</span>Stage 1 features — kept, and now live</h2>
+<table>
+<tr><th style="width:30%">Stage 1 feature</th><th>Where it is now</th></tr>
+<tr><td>Stage viewer (source, tokens, AST, expansion, turtle IR, counts, iteration slider, IR before/after)</td><td><b>Stages tab</b>, computed live for whatever is in the editor; IR recursive / unrolled / <code>--opt</code> / side by side. The static <code>viewer/index.html</code> is also kept and linked.</td></tr>
+<tr><td>Web form (axiom, rules, angle, …)</td><td><b>Form</b> switch in the editor; original <code>web_ui.py</code> kept as "Launch FRACTL Classic UI.bat" (port 8733)</td></tr>
+<tr><td>Build log + generated source</td><td><b>Build log</b> tab: every command, its output and time</td></tr>
+<tr><td>Terminal workflow and scripts</td><td>unchanged (<code>fractl-run.sh</code>, <code>fractl-lsystem.sh</code>, <code>make koch</code> …); the Stages tab lists the exact commands</td></tr>
+</table>
+
+<h2><span class="n">07</span>Verification — proving nothing broke</h2>
+<table>
+<tr><th style="width:30%">Suite</th><th style="width:16%">Result</th><th>What it proves</th></tr>
+<tr><td><code>tests/test_frontend.cpp</code></td><td>79,580 / 0 failed</td><td>lexer, parser, brackets, random rules (incl. the distribution of choices), 3D symbols, scenes, placement, every error message, every demo's command counts</td></tr>
+<tr><td><code>tests/test_runtime.c</code></td><td>36 / 0 failed</td><td>exact 2D and 3D coordinates, push/pop, instance rotation and scale, random numbers repeatable, underflow error</td></tr>
+<tr><td><code>tests/test_pipeline.sh</code></td><td>8 / 0 failed</td><td>end-to-end builds, compile-time errors, Stage 1 pictures byte-identical</td></tr>
+<tr><td><code>tests/test_modes.sh</code></td><td>59 / 0 failed</td><td>for all 17 demos: <b>recursive = unrolled</b>, <b>object+link = JIT</b>, <b>--opt changes nothing</b>, Stage 2 pictures identical; recursive IR far smaller</td></tr>
+<tr><td><code>tests/run_golden.sh</code></td><td>16 / 16 files</td><td>outputs and IR match saved reference copies</td></tr>
+<tr><td>viewer smoke test</td><td>40 / 0 failed</td><td>the static stage viewer renders and degrades correctly</td></tr>
+</table>
+<p>One command, <code>make test</code>, runs everything from a clean build — with zero compiler warnings.</p>
+<div class="why"><span class="t">THE THROUGHLINE (UNCHANGED SINCE STAGE 1)</span>
+No tool fakes a result: the studio runs the real compiler on every Build, the tests compare exact bytes, and every new feature had to leave every old picture unchanged.</div>
+
+<h2><span class="n">08</span>The offline bundle</h2>
+<p><code>make bundle</code> produces <code>dist/FRACTL-Studio</code> (and a 15 MB zip): static <code>fractlc</code> and <code>fr_frontend</code>, the runtime, the studio, the demos,
+the classic UI, the stage viewer and the docs. The presentation laptop only needs WSL with Python.</p>
+<ul>
+<li><b>Launch FRACTL Studio.bat</b>: starts the server in WSL, waits until it answers, and opens Edge as a clean app window.</li>
+<li><b>Check FRACTL Setup.bat</b>: checks WSL, Python and the compiler, and does a real JIT build of the meadow with its time.</li>
+<li>A settings switch turns shadows and wind off for a very weak GPU (not needed on this laptop: 60 fps on integrated graphics).</li>
+</ul>
+
+<h2><span class="n">09</span>Numbers to quote</h2>
+<div class="nums">
+<div class="num"><b>~0.14 s</b><span>edit → build → on screen (meadow, round trip)</span></div>
+<div class="num"><b>60 fps</b><span>39,588 pieces, shadows + wind, integrated Intel GPU</span></div>
+<div class="num"><b>0</b><span>internet, CDN or library dependencies</span></div>
+<div class="num"><b>79,580</b><span>frontend checks (Stage 1: 1,904)</span></div>
+<div class="num"><b>59</b><span>build-mode equivalence checks</span></div>
+<div class="num"><b>17</b><span>example grammars, 2D and 3D</span></div>
+</div>
+
+<h2><span class="n">10</span>Questions you may be asked</h2>
+<div class="qa"><div class="q">Is the growth animation pre-rendered?</div><div class="a">No. Each Build runs the compiler; the animation replays the pieces the compiled program just wrote, in its drawing order. Change the seed and you get a different tree.</div></div>
+<div class="qa"><div class="q">Why write your own renderer instead of using three.js?</div><div class="a">No third-party code, nothing to download, and full control: growth from birth times, grass shading and wind all live in our own shaders.</div></div>
+<div class="qa"><div class="q">What does the GPU do, and what does the CPU do?</div><div class="a">The CPU compiles and runs the program (well under a second). The GPU draws: instancing, growth, lighting, shadows and wind.</div></div>
+<div class="qa"><div class="q">How do you know the new compiler draws the same as the old one?</div><div class="a">The mode-equivalence and golden tests compare output files byte for byte across every build mode and against the Stage 1 and Stage 2 results.</div></div>
+<div class="qa"><div class="q">What if the presentation laptop has no WSL?</div><div class="a">The setup checker says so and explains the one-time install; the compiler itself needs nothing else because it is fully static.</div></div>
+
+<p class="foot">FRACTL Stages 2–3 · tooling, verification and studio (Member 3) · studio.py, studio/ (app.js, render2d.js, render3d.js, stages.js), Makefile, build.ps1, tests/, viewer/, web_ui.py, tools/</p>
+</body></html>

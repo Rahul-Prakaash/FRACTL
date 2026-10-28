@@ -1,0 +1,144 @@
+<!doctype html><html><head><meta charset="utf-8"><title>FRACTL Member 1 - Frontend, Stages 2-3</title><link rel="stylesheet" href="doc.css"></head><body>
+
+<p class="kicker">FRACTL · STAGES 2–3 · MEMBER 1</p>
+<h1>Frontend: from a Plant to a Meadow</h1>
+<p class="sub">What the frontend learned after Stage 1 — branching, random grammars, a 3D alphabet and whole scenes —
+how each piece was added, and how it works.</p>
+<div class="band"><b>Pipeline:</b> .fr source → lexer → parser (fractals + scene) → AST → rewriter (deterministic or <b>random</b>) →
+lower → turtle IR (now <b>13</b> operations) &nbsp;+&nbsp; scene layout → instance table</div>
+
+<div class="say"><span class="t">IN ONE BREATH</span>
+In Stage 1 the frontend understood a single fractal drawn as one line. Now it understands <b>branching</b> plants,
+<b>random</b> grammars that still give the same result every time, a full <b>3D</b> turtle alphabet, and <b>scenes</b> —
+one file that plants a tree in a field of 1,300 grass tufts. Every Stage 1 program still means exactly what it meant before.</div>
+
+<h2><span class="n">01</span>What changed since Stage 1</h2>
+<table>
+<tr><th style="width:21%">Area</th><th style="width:26%">Stage 1</th><th>Now</th></tr>
+<tr><td>Drawing alphabet</td><td><code>F G + -</code> (line only)</td><td><span class="tag s2">Stage 2</span> <code>f [ ]</code> — pen-up and branching<br><span class="tag s3">Stage 3</span> <code>&amp; ^ \ / | ! '</code> — pitch, roll, turn around, thinner, next colour; <code>G</code> becomes a flat blade in 3D</td></tr>
+<tr><td>Rules</td><td>one production per symbol</td><td><span class="tag s3">Stage 3</span> several weighted choices: <code>F -&gt; "F+F" [0.6] | "F-F" [0.4];</code> plus <code>seed:</code></td></tr>
+<tr><td>File structure</td><td>exactly one <code>fractal</code></td><td><span class="tag s3">Stage 3</span> several fractals + a <code>scene</code> with <code>place</code> and <code>scatter</code> (clumps, size variation)</td></tr>
+<tr><td>Checks</td><td>syntax, duplicates, expansion limit</td><td><span class="tag s2">Stage 2</span> bracket balance at compile time · <span class="tag s3">Stage 3</span> weights, seeds, colours, dimensions, scene references …</td></tr>
+<tr><td>Known limits fixed</td><td>UTF-8 BOM rejected; brackets unchecked</td><td>both fixed in Stage 2</td></tr>
+<tr><td>Turtle IR</td><td>6 operations, 3 used</td><td>13 operations, all used — new ones <b>appended</b>, old numbers unchanged</td></tr>
+<tr><td>Inspection</td><td><code>fr_frontend --json</code> for one fractal</td><td>adds max branch depth, 3D fields, and <code>--fractal NAME</code> for scene files (feeds the studio's live Stages tab)</td></tr>
+</table>
+
+<h2><span class="n">02</span>Branching: <code>f</code>, <code>[</code> and <code>]</code> <span class="tag s2">Stage 2</span></h2>
+<p><b>What it is.</b> <code>[</code> saves the turtle (position and heading), <code>]</code> jumps back to it, <code>f</code> moves without drawing.
+With these three symbols a grammar can draw a branch, return to the stem, and draw the next branch — that is what makes plants possible.</p>
+<p><b>How it was added.</b> Because Stage 1 froze <code>ir.hpp</code> with <code>Move</code>, <code>Push</code> and <code>Pop</code> already declared, the
+only frontend change was three new lines in the lowering switch (<code>lower.hpp</code>). No interface changed, so Member 2's code kept compiling untouched.</p>
+<pre><span class="k">case</span> 'f': out = {Op::Move, d.step}; <span class="c">// move, pen up</span>
+<span class="k">case</span> '[': out = {Op::Push, 0.0};    <span class="c">// save the turtle</span>
+<span class="k">case</span> ']': out = {Op::Pop,  0.0};    <span class="c">// return to it</span></pre>
+<p><b>The new compile-time check.</b> A stray <code>]</code> used to compile fine and crash the finished program. Now <code>checkBrackets()</code>
+in the parser checks the axiom and every rule while parsing, so the error points at the exact line and character:</p>
+<pre>line 5: unbalanced brackets in the rule for 'X': '[' at position 7 is never closed</pre>
+<div class="why"><span class="t">WHY CHECK EACH STRING, NOT THE RESULT</span>
+If every rule is balanced, every expansion is balanced too (a balanced string only ever replaces a symbol). Checking the
+short source strings is instant and still knows line numbers; the expanded string can hold 60 million symbols and has none.</div>
+
+<h2><span class="n">03</span>Random grammars that are still repeatable <span class="tag s3">Stage 3</span></h2>
+<p><b>What it is.</b> A rule may offer several productions with weights. Each time the symbol is rewritten, one is picked at random —
+so one grammar grows a different plant every time you change <code>seed:</code>, but the <i>same</i> seed always gives the <i>same</i> plant.</p>
+<pre>F -&gt; "F[+F]F[-F]F" [0.34]
+   | "F[+F]F"      [0.33]
+   | "F[-F]F"      [0.33];</pre>
+<p><b>How it was added.</b></p>
+<ul>
+<li><b>Parser</b> (<code>ruleDecl</code>): reads alternatives separated by <code>|</code>, each with an optional <code>[weight]</code> (default 1, must be &gt; 0). Each alternative is bracket-checked on its own.</li>
+<li><b>AST</b>: no change needed — Stage 1 already stored <code>Production{weight, text}</code> in a list. This was planned from day one.</li>
+<li><b>Rewriter</b>: <code>chooseProduction()</code> multiplies a random number by the total weight and picks the first production whose running sum is larger.</li>
+<li><b>New file <code>rng.hpp</code></b>: where the random numbers come from.</li>
+</ul>
+<h3>The clever part: counter-based randomness</h3>
+<p>Instead of a normal random generator that you keep calling, every choice is computed from three numbers:</p>
+<pre>random = mix64( seed  ^  mix64( pass × P  ^  mix64( n ) ) )      <span class="c">// the n-th choice on that pass</span></pre>
+<p><code>mix64</code> is the well-known SplitMix64 scrambler. Because a choice depends only on <i>(seed, pass, n)</i> — not on how many numbers
+were drawn before — the backend's recursive code (which works depth-first) and this rewriter (which works pass by pass) make
+<b>exactly the same choices</b>. Depth-first order still visits each pass's symbols from left to right, so the counters line up.
+The same function is written once in C++ (<code>rng.hpp</code>) and once in C (<code>runtime.c</code>), bit for bit.</p>
+<div class="say"><span class="t">SAY IT LIKE THIS</span>
+"Our randomness is a pure function of the seed, the rewrite pass and the position. That's why the unrolled compiler, which decides at
+compile time, and the recursive compiler, which decides at run time, draw byte-identical pictures — and we test that on every demo."</div>
+
+<h2><span class="n">04</span>The 3D alphabet <span class="tag s3">Stage 3</span></h2>
+<p>The 3D turtle carries three directions — <b>H</b> (heading), <b>L</b> (left) and <b>U</b> (up) — the frame used in
+<i>The Algorithmic Beauty of Plants</i>. The frontend's job is to turn symbols into operations:</p>
+<table>
+<tr><th>Symbol</th><th>Meaning</th><th>Turtle IR</th></tr>
+<tr><td><code>F</code></td><td>grow a round branch (tube)</td><td>FORWARD</td></tr>
+<tr><td><code>G</code></td><td>grow a flat blade (grass, leaf) — in 2D still a line</td><td>BLADE</td></tr>
+<tr><td><code>+ -</code></td><td>turn left / right (around U)</td><td>TURN_LEFT / TURN_RIGHT</td></tr>
+<tr><td><code>&amp; ^</code></td><td>pitch down / up (around L)</td><td>PITCH_DOWN / PITCH_UP</td></tr>
+<tr><td><code>\ /</code></td><td>roll left / right (around H)</td><td>ROLL_LEFT / ROLL_RIGHT</td></tr>
+<tr><td><code>|</code></td><td>turn around</td><td>TURN_LEFT 180</td></tr>
+<tr><td><code>!</code></td><td>next parts are thinner (× <code>taper</code>)</td><td>THIN</td></tr>
+<tr><td><code>'</code></td><td>next colour in <code>colors</code></td><td>NEXT_COLOR</td></tr>
+</table>
+<p><b>How it was added.</b></p>
+<ul>
+<li><b>New fields</b> in the lexer and parser: <code>dimensions: 3;</code> <code>width:</code> <code>taper:</code> <code>colors: ("#4a2f1c", …);</code> — each validated (dimensions must be 2 or 3, taper in (0, 1], colours must look like <code>#rrggbb</code>).</li>
+<li><b><code>ir.hpp</code></b>: seven new operations <b>appended after <code>Pop</code></b>, so every Stage 1–2 operation keeps its number and old code is unaffected.</li>
+<li><b>One shared function</b>, <code>terminalCmd(decl, symbol)</code> in <code>lower.hpp</code>, says what a single symbol draws. The lowering uses it, and so does
+Member 2's new recursive code generator — so both modes can never disagree about a symbol.</li>
+<li>In a 2D fractal the 3D-only symbols are ignored, so old grammars draw exactly as before.</li>
+</ul>
+
+<h2><span class="n">05</span>Scenes: many fractals in one file <span class="tag s3">Stage 3</span></h2>
+<p><b>What it is.</b> A file can now hold several fractals and a <code>scene</code> that places them:</p>
+<pre>fractal Tree { dimensions: 3; seed: 42; … }
+fractal Tuft { dimensions: 3; seed: 7;  … }
+
+scene Meadow {
+    place   Tree at (0, 0, 0);
+    scatter Tuft 700 within 30 clear 1.2 clumps 22 vary 0.45 seed 11;
+    scatter Tuft 350 within 32 clear 0.8 vary 0.35 seed 13;
+    scatter Tuft 250 within 46 clear 30 clumps 12 vary 0.4 seed 12;
+}</pre>
+<p><b>How it was added.</b> <code>parseFile()</code> reads one or more fractals and an optional scene (<code>parseSource()</code> is kept for single-fractal
+code and old tests). <code>validateFile()</code> then checks the whole file: fractal names are unique, the scene only places fractals that exist,
+and those fractals are 3D. A file with several fractals but no scene is an error.</p>
+<p><b>How placement works</b> (<code>scene.hpp</code>, all at compile time):</p>
+<ul>
+<li><b>Uniform scatter</b>: a random point in the ring between <code>clear</code> and the radius. The radius uses a square root
+(<code>r = √(r₀² + u·(r₁² − r₀²))</code>) so points are spread evenly by <i>area</i>, not bunched in the middle.</li>
+<li><b>Clumps</b> (real patches): <code>clumps N</code> picks N patch centres; each tuft joins one and lands at a Gaussian distance from it
+(Box–Muller), and tufts near a centre grow taller — so grass forms mounds like a real lawn.</li>
+<li><b>Variety</b>: every copy gets a random rotation, a size of <code>1 ± vary</code>, and <b>its own seed</b> (<code>instanceSeed()</code>), so 1,300 tufts from one grammar all grow differently.</li>
+</ul>
+<div class="why"><span class="t">WHY AT COMPILE TIME</span>
+Positions, sizes and seeds become constants in the compiled program, so every build of the same file gives the same meadow — and
+the unrolled and recursive backends receive the identical instance list. Defaults (<code>vary 0.2</code>, no clumps) reproduce the old placement exactly.</div>
+
+<h2><span class="n">06</span>Smaller improvements worth knowing</h2>
+<ul>
+<li><b>BOM accepted</b> (Stage 2): files saved by Windows Notepad start with three invisible bytes; the lexer now skips them.</li>
+<li><b>Branch depth</b> (Stage 2): <code>maxBranchDepth()</code> reports how deeply <code>[</code> nests — shown by <code>--stats</code>, in the JSON, and in the studio (the plant reaches depth 12).</li>
+<li><b><code>fr_frontend --fractal NAME</code></b> (Stage 3): inspect one fractal of a scene file. The JSON export now includes dimensions, seed, width, taper and colours. The studio's live <b>Stages</b> tab is built on exactly this command.</li>
+<li><b>New error messages</b>, all with line numbers: weights must be &gt; 0 · seed must be a whole number ≥ 0 · <code>'dimensions' must be 2 or 3</code> ·
+<code>taper must be in (0, 1]</code> · colour must look like <code>#4f8a2b</code> · scene places unknown fractal · several fractals need a scene · <code>'clear'</code>,
+<code>'clumps'</code>, <code>'vary'</code> ranges · iterations ≤ 60.</li>
+</ul>
+
+<h2><span class="n">07</span>Numbers to quote</h2>
+<div class="nums">
+<div class="num"><b>13</b><span>turtle operations (was 6, 3 used)</span></div>
+<div class="num"><b>1,301</b><span>instances placed for the meadow</span></div>
+<div class="num"><b>0.6 ms</b><span>lex + parse + check + layout (meadow, in the studio)</span></div>
+<div class="num"><b>79,580</b><span>frontend test checks, all passing (Stage 1: 1,904)</span></div>
+<div class="num"><b>0</b><span>changes to the Stage 1–2 meaning of old programs</span></div>
+<div class="num"><b>12</b><span>max branch depth in the fractal plant</span></div>
+</div>
+
+<h2><span class="n">08</span>Questions you may be asked</h2>
+<div class="qa"><div class="q">How can a random grammar give the same result every time?</div><div class="a">The randomness is a deterministic function of the seed, the rewrite pass and the choice's position. Same inputs, same numbers — like a hash, not a dice roll.</div></div>
+<div class="qa"><div class="q">Why weren't the AST or IR headers broken by all these features?</div><div class="a">Stage 1 designed for them: <code>Production</code> already had a weight and the rule table already held a list. New IR operations were appended after the old ones, so existing numbers never moved.</div></div>
+<div class="qa"><div class="q">Is the grammar still LL(1)?</div><div class="a">Yes. Every field and scene item starts with its own keyword (<code>seed</code>, <code>place</code>, <code>scatter</code> …), and alternatives are separated by <code>|</code>, so one token of lookahead still decides every branch.</div></div>
+<div class="qa"><div class="q">What happens with an unbalanced bracket?</div><div class="a">It is rejected while parsing, with the line and character position. It can no longer reach the compiled program.</div></div>
+<div class="qa"><div class="q">Why compute the scene layout in the frontend instead of at run time?</div><div class="a">It makes builds reproducible and lets both backends work from one identical instance list; the backend then stores it as a constant table.</div></div>
+<div class="qa"><div class="q">How do 1,300 tufts look different if they share one grammar?</div><div class="a">Each copy gets its own seed, so its random rule choices differ, plus its own position, rotation and size.</div></div>
+
+<p class="foot">FRACTL Stages 2–3 · frontend (Member 1) · lexer.hpp, parser.hpp, ast.hpp, ir.hpp, rewriter.hpp, rng.hpp, lower.hpp, scene.hpp, frontend.hpp, json.hpp, fr_frontend.cpp</p>
+</body></html>
