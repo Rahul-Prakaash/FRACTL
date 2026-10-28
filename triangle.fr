@@ -1,0 +1,14 @@
+
+fractal Triangle {
+    axiom: "F--F--F";
+
+    rules {
+        F -> "F";
+    }
+
+    angle: 60;
+    iterations: 0;
+    step: 100;
+    start: (100, 300);
+    heading: 0;
+}

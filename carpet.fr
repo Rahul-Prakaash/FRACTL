@@ -1,0 +1,14 @@
+fractal Carpet {
+    axiom: "F";
+
+    rules {
+        F -> "F+F-F-F-f+F+F+F-F";
+        f -> "fff";
+    }
+
+    angle: 90;
+    iterations: 4;
+    step: 5;
+    start: (0, 0);
+    heading: 0;
+}

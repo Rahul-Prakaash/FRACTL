@@ -1,0 +1,49 @@
+fractal Tree {
+    dimensions: 3;
+    seed: 42;
+    axiom: "FA";
+
+    rules {
+        A -> "[&F['^^GG][''&&GG]['|^GG]!A]/////[&F['^GG]!A]///////[&F[''^^GG]!A]" [0.65]
+           | "[&F['^GG][''&GG]!A]////////[&&F[''&GG]!A]"                         [0.35];
+        F -> "F" [0.5] | "FF" [0.5];
+    }
+
+    angle: 22.5;
+    iterations: 7;
+    step: 0.9;
+    width: 2.0;
+    taper: 0.78;
+    colors: ("#4a2f1c", "#3f8a2a", "#7cbd45");
+}
+
+fractal Tuft {
+    dimensions: 3;
+    seed: 7;
+    axiom: "T";
+
+    rules {
+        T -> "[B]///////[B]//////[B]////////[B]///////[B]//////[B]/////////[B]" [0.40]
+           | "[B]/////////[B]////////[B]/////////[B]////////[B]"              [0.35]
+           | "[^B]//////////[B]////////////[&B]//////////[B]"                  [0.25];
+        B -> "&G!&G!&G!&&G!&&G"   [0.30]
+           | "^G&G!&G!&G!&&G"     [0.25]
+           | "G!&G!&G!&G!&G!&&G"  [0.20]
+           | "'&G!&G!&&G!&&G"     [0.15]
+           | "''&&G!&G!&&G"       [0.10];
+    }
+
+    angle: 7;
+    iterations: 2;
+    step: 0.85;
+    width: 0.42;
+    taper: 0.8;
+    colors: ("#2f6b1f", "#4f8f2d", "#86b84a");
+}
+
+scene Meadow {
+    place Tree at (0, 0, 0);
+    scatter Tuft 700 within 30 clear 1.2 clumps 22 vary 0.45 seed 11;
+    scatter Tuft 350 within 32 clear 0.8 vary 0.35 seed 13;
+    scatter Tuft 250 within 46 clear 30 clumps 12 vary 0.4 seed 12;
+}

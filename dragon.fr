@@ -1,0 +1,14 @@
+fractal Dragon {
+    axiom: "FX";
+
+    rules {
+        X -> "X+YF+";
+        Y -> "-FX-Y";
+    }
+
+    angle: 90;
+    iterations: 12;
+    step: 5;
+    start: (0, 0);
+    heading: 0;
+}

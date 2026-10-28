@@ -1,0 +1,18 @@
+fractal Tree {
+    dimensions: 3;
+    seed: 42;
+    axiom: "FA";
+
+    rules {
+        A -> "[&F['^^GG][''&&GG]['|^GG]!A]/////[&F['^GG]!A]///////[&F[''^^GG]!A]" [0.65]
+           | "[&F['^GG][''&GG]!A]////////[&&F[''&GG]!A]"                         [0.35];
+        F -> "F" [0.5] | "FF" [0.5];
+    }
+
+    angle: 22.5;
+    iterations: 7;
+    step: 0.6;
+    width: 1.4;
+    taper: 0.78;
+    colors: ("#4a2f1c", "#3f8a2a", "#7cbd45");
+}
