@@ -21,5 +21,5 @@ node_modules/
 # local backups
 .comment_strip_backup_*/
 
-# raw screenshots (the report uses the JPEG copies in docs/report/img/)
-docs/report/shots/
+# the lab report and its sources are kept locally, not published
+docs/report/
