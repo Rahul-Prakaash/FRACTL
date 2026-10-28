@@ -1,0 +1,11 @@
+fractal Gosper {
+    axiom: "F";
+    rules {
+        F -> "F-G--G+F++FF+G-";
+        G -> "+F-GG--G-F++F+G";
+    }
+    angle: 60;
+    iterations: 4;
+    step: 7;
+    heading: 0;
+}

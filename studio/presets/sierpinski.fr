@@ -1,0 +1,11 @@
+fractal Arrowhead {
+    axiom: "F";
+    rules {
+        F -> "G-F-G";
+        G -> "F+G+F";
+    }
+    angle: 60;
+    iterations: 7;
+    step: 3;
+    heading: 0;
+}

@@ -1,0 +1,10 @@
+fractal Weed {
+    axiom: "F";
+    rules {
+        F -> "FF-[-F+F+F]+[+F-F-F]";
+    }
+    angle: 22.5;
+    iterations: 4;
+    step: 8;
+    heading: 90;
+}

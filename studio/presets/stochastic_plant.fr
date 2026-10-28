@@ -1,0 +1,13 @@
+fractal Wildflower {
+    seed: 2026;
+    axiom: "F";
+    rules {
+        F -> "F[+F]F[-F]F" [0.34]
+           | "F[+F]F"      [0.33]
+           | "F[-F]F"      [0.33];
+    }
+    angle: 25.7;
+    iterations: 6;
+    step: 3;
+    heading: 90;
+}

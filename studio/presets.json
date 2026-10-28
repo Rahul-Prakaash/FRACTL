@@ -1,0 +1,20 @@
+[
+  {"id": "meadow",     "mode": "3d", "file": "meadow.fr",                    "title": "Meadow",              "about": "A stochastic tree in 1,300 grass tufts grown in patches: two grammars, one scene, every tuft from its own seed."},
+  {"id": "tree3d",     "mode": "3d", "file": "tree3d.fr",                    "title": "Tree",                "about": "Branches pitch out with &, roll with /, thin with !, and grow leaves at every node."},
+  {"id": "field",      "mode": "3d", "file": "studio/presets/field.fr",      "title": "Grass field",         "about": "1,350 tufts in 36 patches from one grammar; recursive code keeps the IR the size of the grammar."},
+  {"id": "tuft",       "mode": "3d", "file": "studio/presets/tuft.fr",       "title": "Grass tuft",          "about": "One clump of blades; G draws a flat blade instead of a tube."},
+  {"id": "shrub",      "mode": "3d", "file": "studio/presets/bush3d.fr",     "title": "Shrub",               "about": "A dense three-way branching bush with random internode lengths."},
+
+  {"id": "wildflower", "mode": "2d", "file": "studio/presets/stochastic_plant.fr", "title": "Wildflower (stochastic)", "about": "Stage 3: weighted rules and a seed. Change the seed for a new plant."},
+  {"id": "plant",      "mode": "2d", "file": "plant.fr",                     "title": "Fractal plant",       "viewer": "plant", "about": "Branching with [ and ], ABOP fig. 1.24f."},
+  {"id": "tree2d",     "mode": "2d", "file": "tree.fr",                      "title": "Tree",                "viewer": "tree", "about": "ABOP fig. 1.24d, one branch to each side per node."},
+  {"id": "bush2d",     "mode": "2d", "file": "studio/presets/bush.fr",       "title": "Bush",                "about": "Two side branches per node, then the stem grows on."},
+  {"id": "weed",       "mode": "2d", "file": "studio/presets/weed.fr",       "title": "Weed",                "about": "Every segment sprouts a left and a right twig."},
+  {"id": "koch",       "mode": "2d", "file": "koch.fr",                      "title": "Koch snowflake",      "viewer": "koch", "about": "Stage 1: one continuous line, 768 segments."},
+  {"id": "dragon",     "mode": "2d", "file": "dragon.fr",                    "title": "Heighway dragon",     "viewer": "dragon", "about": "X and Y draw nothing; they only steer the rewriting."},
+  {"id": "carpet",     "mode": "2d", "file": "carpet.fr",                    "title": "Sierpinski carpet",   "viewer": "carpet", "about": "Lowercase f moves without drawing; that leaves the holes."},
+  {"id": "arrowhead",  "mode": "2d", "file": "studio/presets/sierpinski.fr", "title": "Sierpinski arrowhead", "about": "F and G both draw; alternating turns build the triangle."},
+  {"id": "hilbert",    "mode": "2d", "file": "studio/presets/hilbert.fr",    "title": "Hilbert curve",       "about": "A space-filling curve; A and B only steer."},
+  {"id": "gosper",     "mode": "2d", "file": "studio/presets/gosper.fr",     "title": "Gosper curve",        "about": "The hexagonal flowsnake."},
+  {"id": "triangle",   "mode": "2d", "file": "triangle.fr",                  "title": "Triangle",            "viewer": "triangle", "about": "Stage 1's first integration test."}
+]

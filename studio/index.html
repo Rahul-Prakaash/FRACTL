@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FRACTL Studio</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23070b0d'/%3E%3Cpath d='M16 28V16M16 16l-7-7M16 16l7-7M9 9l-3-5M9 9l-5 1M23 9l3-5M23 9l5 1' stroke='%238ef0c4' stroke-width='2.4' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/studio/style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <svg class="glyph" viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M16 29V17M16 17l-7-7M16 17l7-7M9 10l-3-5M9 10l-5 1M23 10l3-5M23 10l5 1M16 17V7" />
+    </svg>
+    <span class="word">FRACTL</span><span class="tag">studio</span>
+  </div>
+
+  <div class="dims" role="tablist" aria-label="Mode">
+    <span class="pill" aria-hidden="true"></span>
+    <button role="tab" data-dims="2d" id="tab2d">2D</button>
+    <button role="tab" data-dims="3d" id="tab3d">3D</button>
+  </div>
+
+  <div class="actions">
+    <select id="preset" aria-label="Preset"></select>
+    <button id="settingsBtn" class="ghost" title="Compiler settings">
+      <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>
+    </button>
+    <button id="buildBtn" class="build" title="Compile and grow (Ctrl+Enter)">
+      <svg viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z"/></svg><span>Build</span>
+    </button>
+  </div>
+</header>
+
+<div id="settings" class="popover" hidden>
+  <h4>Code generation</h4>
+  <label class="opt"><input type="radio" name="codegen" value="recursive" checked> Recursive <small>one LLVM function per rule symbol</small></label>
+  <label class="opt"><input type="radio" name="codegen" value="unroll"> Unrolled <small>Stage 2: one call per command</small></label>
+  <h4>Backend</h4>
+  <label class="opt"><input type="radio" name="backend" value="jit" checked> ORC JIT <small>compile in memory and run</small></label>
+  <label class="opt"><input type="radio" name="backend" value="aot"> Object + link <small>native .o, cc, run</small></label>
+  <h4>Optimizer</h4>
+  <label class="opt"><input type="checkbox" id="optFlag"> --opt <small>fold adjacent rotations</small></label>
+  <h4>Growth</h4>
+  <label class="opt row">Duration <input type="range" id="duration" min="8" max="180" value="40"><output id="durationOut">40 s</output></label>
+  <label class="opt"><input type="radio" name="order" value="together" checked> Together <small>every instance grows at once</small></label>
+  <label class="opt"><input type="radio" name="order" value="emission"> Emission order <small>exactly the order the program drew</small></label>
+  <label class="opt"><input type="checkbox" id="autoRotate" checked> Orbit while growing</label>
+  <label class="opt"><input type="checkbox" id="quality" checked> Shadows &amp; wind <small>turn off on a very slow GPU</small></label>
+</div>
+
+<main class="layout">
+  <section class="left">
+    <div class="panel editor-panel">
+      <div class="panel-head">
+        <span class="label">Source</span>
+        <span id="fileName" class="muted mono">meadow.fr</span>
+        <span class="spacer"></span>
+        <span id="cursorPos" class="muted mono"></span>
+        <div class="seg" id="editMode" role="tablist" aria-label="Input">
+          <button data-mode="code" class="on">Code</button><button data-mode="form">Form</button>
+        </div>
+      </div>
+      <form class="formview" id="formView" hidden autocomplete="off">
+        <p class="note" id="formNote"></p>
+        <div class="frow">
+          <label>Name<input name="name" spellcheck="false"></label>
+          <label>Seed<input name="seed" type="number" min="0" step="1" placeholder="0"></label>
+        </div>
+        <label>Axiom<input name="axiom" spellcheck="false" placeholder="F--F--F"></label>
+        <label>Rules <small>one per line, SYMBOL=replacement · repeat a symbol for random alternatives, weight with @0.6</small>
+          <textarea name="rules" spellcheck="false" rows="5" placeholder="F=F+F--F+F"></textarea></label>
+        <div class="frow">
+          <label>Angle °<input name="angle" type="number" step="any"></label>
+          <label>Iterations<input name="iterations" type="number" min="0" max="60" step="1"></label>
+          <label>Step<input name="step" type="number" step="any" min="0"></label>
+          <label>Heading °<input name="heading" type="number" step="any"></label>
+        </div>
+        <div class="frow only3d">
+          <label>Width<input name="width" type="number" step="any" min="0"></label>
+          <label>Taper<input name="taper" type="number" step="any" min="0" max="1"></label>
+          <label class="grow2">Colours<input name="colors" spellcheck="false" placeholder="#5b3b24, #4f9a35"></label>
+        </div>
+        <p class="hint">F G draw · f moves · + − turn · [ ] save/restore<span class="only3d"> · &amp; ^ pitch · \ / roll · | turn around · ! thinner · ' next colour</span></p>
+      </form>
+      <div class="editor" id="editor">
+        <div class="gutter" id="gutter" aria-hidden="true"></div>
+        <div class="code">
+          <pre class="hl" id="highlight" aria-hidden="true"></pre>
+          <textarea id="source" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Fractal source"></textarea>
+        </div>
+      </div>
+      <div class="errorbar" id="errorbar" hidden></div>
+    </div>
+
+    <div class="panel pipeline-panel">
+      <div class="panel-head">
+        <span class="label">Compiler pipeline</span>
+        <span class="spacer"></span>
+        <span id="totalTime" class="muted mono"></span>
+      </div>
+      <ol class="pipeline" id="pipeline"></ol>
+    </div>
+  </section>
+
+  <section class="stage" id="stage">
+    <canvas id="gl3d"></canvas>
+    <canvas id="cv2d"></canvas>
+
+    <div class="views seg" id="views" role="tablist" aria-label="View">
+      <button data-view="render" class="on">Render</button><button data-view="stages">Stages</button><button data-view="log">Build log</button>
+    </div>
+
+    <div class="stage-title">
+      <h1 id="presetTitle">Meadow</h1>
+      <p id="presetAbout"></p>
+    </div>
+
+    <div class="sheet" id="stagesView" hidden>
+      <div class="sheet-bar">
+        <label class="sel" id="stFractalWrap">Fractal <select id="stFractal"></select></label>
+        <label class="iter">Iteration <input type="range" id="stIter" min="0" max="0" value="0"><output id="stIterOut">n = 0</output></label>
+        <span class="spacer"></span>
+        <span class="muted mono" id="stInfo"></span>
+      </div>
+      <div class="sheet-error" id="stError" hidden></div>
+      <div class="stages-grid">
+        <section class="card"><header><h3>Source</h3><span class="muted mono" id="stSrcInfo"></span></header><pre class="code-block" id="stSource"></pre></section>
+        <section class="card"><header><h3>AST</h3><span class="muted mono" id="stAstInfo"></span></header><div class="card-body" id="stAst"></div></section>
+        <section class="card"><header><h3>Tokens</h3><span class="muted mono" id="stTokInfo"></span><button class="ghost small" id="stTokMore">show all</button></header><div class="card-body scroll" id="stTokens"></div></section>
+        <section class="card"><header><h3>Turtle IR</h3><span class="muted mono" id="stIrInfo"></span><button class="ghost small" id="stIrMore">show more</button></header><div class="card-body scroll" id="stTurtle"></div></section>
+        <section class="card wide"><header><h3>Expanded L-system string</h3><span class="muted mono" id="stExpInfo"></span><button class="ghost small" id="stExpMore">show full</button></header><pre class="code-block wrap" id="stExpanded"></pre></section>
+        <section class="card"><header><h3>Counts</h3><span class="muted mono" id="stCountInfo"></span></header><div class="card-body" id="stCounts"></div></section>
+        <section class="card"><header><h3>Pipeline commands</h3></header><div class="card-body" id="stCmds"></div></section>
+        <section class="card wide"><header><h3>LLVM IR</h3><span class="muted mono" id="stLlInfo"></span>
+          <div class="seg small" id="stLlMode"><button data-ll="recursive" class="on">Recursive</button><button data-ll="unroll">Unrolled</button><button data-ll="opt">--opt</button><button data-ll="side">Side by side</button></div></header>
+          <div class="ll-wrap" id="stLl"></div></section>
+      </div>
+    </div>
+
+    <div class="sheet" id="logView" hidden>
+      <div class="sheet-bar"><span class="label">Build log</span><span class="spacer"></span><span class="muted mono" id="logInfo"></span></div>
+      <div class="log-body" id="logBody"><p class="muted">Build first — every command the studio runs, and everything it printed, appears here.</p></div>
+    </div>
+
+    <div class="chips" id="chips"></div>
+
+    <div class="status" id="status">
+      <div class="status-line"><span class="dot"></span><span id="statusText">Ready</span></div>
+    </div>
+
+    <div class="empty" id="empty">
+      <div class="empty-glyph"></div>
+      <p>Press <b>Build</b> to compile the grammar with LLVM and watch it grow.</p>
+      <p class="muted">Nothing here is pre-rendered: every build runs the compiler.</p>
+    </div>
+
+    <div class="ir" id="irPanel" hidden>
+      <div class="panel-head">
+        <span class="label">Generated LLVM IR</span>
+        <span id="irInfo" class="muted mono"></span>
+        <span class="spacer"></span>
+        <button class="ghost small" id="irClose">Close</button>
+      </div>
+      <pre id="irText" class="mono"></pre>
+    </div>
+
+    <div class="hud">
+      <button class="round" id="playBtn" title="Play / pause (Space)">
+        <svg viewBox="0 0 24 24" class="i-play"><path d="M8 5l11 7-11 7z"/></svg>
+        <svg viewBox="0 0 24 24" class="i-pause"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+      </button>
+      <button class="round" id="restartBtn" title="Grow again">
+        <svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 0 2-5"/><path d="M5 4v4h4"/></svg>
+      </button>
+      <div class="scrub">
+        <input type="range" id="scrub" min="0" max="1000" value="0" aria-label="Growth">
+        <div class="scrub-fill" id="scrubFill"></div>
+      </div>
+      <span class="mono time" id="timeLabel">0%</span>
+      <div class="speed" role="group" aria-label="Speed">
+        <button data-speed="0.5">½×</button><button data-speed="1" class="on">1×</button><button data-speed="4">4×</button><button data-speed="0">⏭</button>
+      </div>
+      <button class="ghost small" id="stagesBtn" title="Tokens, AST, turtle IR and LLVM IR in the stage viewer" hidden>Stages ↗</button>
+      <button class="ghost small" id="irBtn">LLVM IR</button>
+      <button class="ghost small" id="exportBtn">Export</button>
+      <button class="ghost small" id="viewBtn" title="Reset camera">Reset view</button>
+    </div>
+  </section>
+</main>
+
+<script src="/studio/render2d.js"></script>
+<script src="/studio/render3d.js"></script>
+<script src="/studio/app.js"></script>
+<script src="/studio/stages.js"></script>
+</body>
+</html>

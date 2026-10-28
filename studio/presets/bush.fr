@@ -1,0 +1,11 @@
+fractal Bush {
+    axiom: "X";
+    rules {
+        X -> "F[+X][-X]FX";
+        F -> "FF";
+    }
+    angle: 25.7;
+    iterations: 7;
+    step: 2;
+    heading: 90;
+}

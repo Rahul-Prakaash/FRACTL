@@ -1,0 +1,11 @@
+fractal Hilbert {
+    axiom: "A";
+    rules {
+        A -> "-BF+AFA+FB-";
+        B -> "+AF-BFB-FA+";
+    }
+    angle: 90;
+    iterations: 6;
+    step: 7;
+    heading: 0;
+}
