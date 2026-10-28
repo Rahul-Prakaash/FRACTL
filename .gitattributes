@@ -1,0 +1,16 @@
+# Keep LF in the working tree on every OS: the shell scripts, Makefile and
+# golden files are used from WSL/Linux even when the repo is cloned on Windows.
+* text=auto eol=lf
+
+# Windows-only launchers need CRLF
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# golden outputs are compared byte for byte
+tests/golden/** -text
+tests/phase1/** -text
+tests/phase2/** -text
+
+*.pdf binary
+*.png binary
+*.jpg binary
